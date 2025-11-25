@@ -34,6 +34,8 @@ services:
       - WP_API_URL=${WP_API_URL}
       - WP_USER=${WP_USER}
       - WP_APP_PASSWORD=${WP_APP_PASSWORD}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -49,3 +51,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

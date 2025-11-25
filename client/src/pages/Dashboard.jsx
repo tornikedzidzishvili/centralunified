@@ -14,6 +14,7 @@ export default function Dashboard({ user, onLogout }) {
   const [lastSync, setLastSync] = useState(null);
   const [stats, setStats] = useState({ today: 0, month: 0, pending: 0, approved: 0, rejected: 0 });
   const [logoUrl, setLogoUrl] = useState('');
+  const [noBranches, setNoBranches] = useState(false);
   
   // Pagination and search
   const [page, setPage] = useState(1);
@@ -69,6 +70,7 @@ export default function Dashboard({ user, onLogout }) {
       });
       setLoans(res.data.loans);
       setPagination(res.data.pagination);
+      setNoBranches(res.data.noBranches || false);
     } finally {
       setLoading(false);
     }
@@ -91,11 +93,11 @@ export default function Dashboard({ user, onLogout }) {
   
   const requestLoan = async (loanId) => {
     try {
-      await api.post(`/loans/${loanId}/request`, { userId: user.id });
-      alert('მოთხოვნა გაიგზავნა მენეჯერთან');
+      await api.post(`/loans/${loanId}/take`, { userId: user.id });
+      alert('განაცხადი წარმატებით აიღეთ');
       fetchLoans();
     } catch (e) {
-      alert(e.response?.data?.error || 'მოთხოვნა ვერ გაიგზავნა');
+      alert(e.response?.data?.error || 'ვერ მოხერხდა');
     }
   };
   
@@ -256,54 +258,77 @@ export default function Dashboard({ user, onLogout }) {
     return branch.split(' ')[0]; // Return first word if no match
   };
 
+  // Mask personal ID - show only last 4 digits if loan is not taken
+  const maskPersonalId = (personalId, loan) => {
+    if (!personalId) return '-';
+    
+    // Show full ID if loan is assigned (taken by an officer)
+    if (loan?.assignedToId) {
+      return personalId;
+    }
+    
+    // Show full ID for admin/manager roles
+    if (user.role === 'admin' || user.role === 'manager') {
+      return personalId;
+    }
+    
+    // Mask all but last 4 digits
+    if (personalId.length <= 4) return personalId;
+    const masked = '*'.repeat(personalId.length - 4) + personalId.slice(-4);
+    return masked;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center gap-2 sm:gap-3">
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-10 object-contain" />
+                <img src={logoUrl} alt="Logo" className="h-8 sm:h-10 object-contain" />
               ) : (
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
               )}
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Central MFO</h1>
-                <p className="text-xs text-slate-500">Unified Platform</p>
+              <div className="hidden xs:block">
+                <h1 className="text-base sm:text-lg font-bold text-slate-800">Central MFO</h1>
+                <p className="text-xs text-slate-500 hidden sm:block">Unified Platform</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-slate-600">{user.username[0].toUpperCase()}</span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs sm:text-sm font-medium text-slate-600">{user.username[0].toUpperCase()}</span>
                 </div>
-                <div className="hidden sm:block">
+                <div className="hidden md:block">
                   <p className="text-sm font-medium text-slate-700">{user.username}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadge(user.role)}`}>{user.role}</span>
                 </div>
               </div>
               {(user.role === 'admin' || user.role === 'manager') && (
-                <Link to="/users" className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                  <Users size={16} /> მომხმარებლები
+                <Link to="/users" className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                  <Users size={14} className="sm:w-4 sm:h-4" /> 
+                  <span className="hidden sm:inline">მომხმარებლები</span>
                 </Link>
               )}
               {user.role === 'admin' && (
-                <Link to="/settings" className="flex items-center justify-center w-10 h-10 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="პარამეტრები">
-                  <Settings size={18} />
+                <Link to="/settings" className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="პარამეტრები">
+                  <Settings size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </Link>
               )}
               <button 
                 onClick={() => { setShowLoanSearch(true); resetLoanSearch(); }} 
-                className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                 title="სესხის ძიება"
               >
-                <Search size={16} /> სესხის ძიება
+                <Search size={14} className="sm:w-4 sm:h-4" /> 
+                <span className="hidden md:inline">სესხის ძიება</span>
               </button>
-              <button onClick={onLogout} className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                <LogOut size={16} /> Logout
+              <button onClick={onLogout} className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                <LogOut size={14} className="sm:w-4 sm:h-4" /> 
+                <span className="hidden sm:inline">გასვლა</span>
               </button>
             </div>
           </div>
@@ -398,61 +423,61 @@ export default function Dashboard({ user, onLogout }) {
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-blue-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{stats.today}</p>
-                <p className="text-xs text-slate-500">დღის განაცხადები</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{stats.month}</p>
-                <p className="text-xs text-slate-500">თვის განაცხადები</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-slate-800">{stats.today}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 truncate">დღის განაცხადები</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-yellow-600" />
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{stats.pending}</p>
-                <p className="text-xs text-slate-500">მოლოდინში</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <ThumbsUp className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{stats.approved}</p>
-                <p className="text-xs text-slate-500">დამტკიცებული</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-slate-800">{stats.month}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 truncate">თვის განაცხადები</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <ThumbsDown className="w-5 h-5 text-red-600" />
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{stats.rejected}</p>
-                <p className="text-xs text-slate-500">უარყოფილი</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-slate-800">{stats.pending}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 truncate">მოლოდინში</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ThumbsUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-slate-800">{stats.approved}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 truncate">დამტკიცებული</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4 col-span-2 sm:col-span-1">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ThumbsDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-slate-800">{stats.rejected}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 truncate">უარყოფილი</p>
               </div>
             </div>
           </div>
@@ -460,18 +485,18 @@ export default function Dashboard({ user, onLogout }) {
 
         {/* Assignment Requests Notification for Manager/Admin */}
         {(user.role === 'manager' || user.role === 'admin') && assignmentRequests.length > 0 && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-orange-600" />
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Bell className="w-5 h-5 text-orange-600 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-orange-800">{assignmentRequests.length} მოთხოვნა მოლოდინშია</p>
+                  <p className="font-medium text-orange-800 text-sm sm:text-base">{assignmentRequests.length} მოთხოვნა მოლოდინშია</p>
                   <p className="text-xs text-orange-600">ექსპერტები ითხოვენ განაცხადების აღებას</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowRequests(!showRequests)}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-orange-700 self-start sm:self-auto"
               >
                 {showRequests ? 'დამალვა' : 'ნახვა'}
               </button>
@@ -480,9 +505,9 @@ export default function Dashboard({ user, onLogout }) {
             {showRequests && (
               <div className="mt-4 space-y-2">
                 {assignmentRequests.map(req => (
-                  <div key={req.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-orange-100">
+                  <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 bg-white p-3 rounded-lg border border-orange-100">
                     <div>
-                      <p className="font-medium text-slate-800">{req.loan.firstName} {req.loan.lastName}</p>
+                      <p className="font-medium text-slate-800 text-sm sm:text-base">{req.loan.firstName} {req.loan.lastName}</p>
                       <p className="text-xs text-slate-500">
                         მოითხოვა: <span className="font-medium">{req.requestedBy.username}</span> • 
                         ფილიალი: {req.loan.branch}
@@ -497,7 +522,7 @@ export default function Dashboard({ user, onLogout }) {
                       </button>
                       <button 
                         onClick={() => handleAssignmentRequest(req.id, 'reject')}
-                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+                        className="px-2 sm:px-3 py-1 sm:py-1.5 bg-red-600 text-white rounded-lg text-xs sm:text-sm hover:bg-red-700"
                       >
                         უარყოფა
                       </button>
@@ -509,140 +534,141 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">განაცხადები</h2>
-              <p className="text-slate-500 mt-1">{pagination.total} განაცხადი ნაპოვნია</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">განაცხადები</h2>
+              <p className="text-slate-500 text-sm mt-0.5">{pagination.total} განაცხადი ნაპოვნია</p>
             </div>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {/* Search */}
-              <form onSubmit={handleSearch} className="flex items-center gap-2">
-                <div className="relative">
+              <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <div className="relative flex-1 sm:flex-initial">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="ძებნა პ/ნ, სახელი, ტელ..."
+                    placeholder="ძებნა..."
                     value={searchInput}
                     onChange={e => setSearchInput(e.target.value)}
-                    className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full sm:w-40 md:w-48 pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
-                <button type="submit" className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+                <button type="submit" className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-medium">
                   ძებნა
                 </button>
                 {search && (
-                  <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }} className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm hover:bg-slate-300">
+                  <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }} className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm hover:bg-slate-300 font-medium">
                     გასუფთავება
                   </button>
                 )}
               </form>
-              <button onClick={() => { fetchLoans(); fetchStats(); fetchLastSync(); if (user.role !== 'officer') fetchAssignmentRequests(); }} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
+              <button onClick={() => { fetchLoans(); fetchStats(); fetchLastSync(); if (user.role !== 'officer') fetchAssignmentRequests(); }} className="flex items-center justify-center w-10 h-10 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
                 <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
-            {lastSync && (
-              <span className="text-xs text-slate-500">
-                ბოლო: {new Date(lastSync).toLocaleString('ka-GE')}
-              </span>
-            )}
           </div>
+          {lastSync && (
+            <span className="text-xs text-slate-500">
+              ბოლო სინქრონიზაცია: {new Date(lastSync).toLocaleString('ka-GE')}
+            </span>
+          )}
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">სახელი / გვარი</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">მობილური</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ფილიალი</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">სტატუსი</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ექსპერტი</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">სახელი / გვარი</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">მობილური</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">ფილიალი</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">სტატუსი</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">ექსპერტი</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">იტვირთება...</td></tr>
+                ) : noBranches ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <Building2 className="w-12 h-12 mx-auto mb-3 text-amber-400" />
+                      <p className="text-slate-700 font-medium mb-2">ფილიალი არ არის მინიჭებული</p>
+                      <p className="text-slate-500 text-sm">გთხოვთ დაელოდოთ, ადმინისტრატორი მოგანიჭებთ ფილიალს</p>
+                    </td>
+                  </tr>
                 ) : loans.length === 0 ? (
                   <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500"><FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />განაცხადები არ მოიძებნა</td></tr>
                 ) : loans.map(loan => (
                   <tr key={loan.id} className={`hover:bg-slate-50 transition-colors ${loan.status === 'approved' ? 'bg-green-50/50' : loan.status === 'rejected' ? 'bg-red-50/50' : loan.status === 'in_progress' ? 'bg-blue-50/50' : ''}`}>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <div className="flex items-center gap-2">
-                        <div>
-                          <p className="font-medium text-slate-800 text-sm">{loan.firstName} {loan.lastName}</p>
-                          <p className="text-xs text-slate-500">{loan.email || ''}</p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 text-xs sm:text-sm truncate">{loan.firstName} {loan.lastName}</p>
+                          <p className="text-[10px] sm:text-xs text-slate-500 truncate">{loan.email || ''}</p>
                         </div>
                         {loan.verificationStatus && (
                           <span title="CreditInfo ვერიფიცირებული" className="flex-shrink-0">
-                            <ShieldCheck size={18} className="text-green-500" />
+                            <ShieldCheck size={16} className="text-green-500" />
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 text-sm">{loan.mobile}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs">{getShortBranch(loan.branch)}</span>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-slate-600 text-xs sm:text-sm">{loan.mobile}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
+                      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-slate-100 text-slate-700 rounded-md text-[10px] sm:text-xs">{getShortBranch(loan.branch)}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(loan.status || 'pending')}`}>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
+                      <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${getStatusBadge(loan.status || 'pending')}`}>
                         {getStatusText(loan.status || 'pending')}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
                       {loan.assignedTo ? (
-                        <span className="text-sm text-slate-700">{loan.assignedTo.username}</span>
+                        <span className="text-xs sm:text-sm text-slate-700">{loan.assignedTo.username}</span>
                       ) : (
-                        <span className="text-slate-400 text-sm">-</span>
+                        <span className="text-slate-400 text-xs sm:text-sm">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <div className="flex items-center gap-1">
                         <button 
-                          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          className="p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                           onClick={() => setSelectedLoan(loan)}
                           title="დეტალები"
                         >
-                          <Eye size={16} />
+                          <Eye size={14} className="sm:w-4 sm:h-4" />
                         </button>
-                        {/* Officer can request to take unassigned pending loans */}
+                        {/* Officer can directly take unassigned pending loans */}
                         {user.role === 'officer' && loan.status === 'pending' && !loan.assignedToId && (
                           <button 
-                            className={`p-2 rounded-lg transition-colors ${
-                              loan.assignmentRequests?.some(r => r.requestedById === user.id)
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-orange-500 hover:bg-orange-600'
-                            } text-white`}
+                            className="p-1.5 sm:p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
                             onClick={() => requestLoan(loan.id)}
-                            disabled={loan.assignmentRequests?.some(r => r.requestedById === user.id)}
-                            title={loan.assignmentRequests?.some(r => r.requestedById === user.id) ? 'მოთხოვნა გაგზავნილია' : 'აღება'}
+                            title="აღება"
                           >
-                            <Hand size={16} />
+                            <Hand size={14} className="sm:w-4 sm:h-4" />
                           </button>
                         )}
                         {/* Manager/Admin can directly assign */}
                         {(user.role === 'admin' || user.role === 'manager') && loan.status === 'pending' && !loan.assignedToId && (
                           <button 
-                            className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                            className="p-1.5 sm:p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                             onClick={() => setAssigningLoan(loan)}
                             title="ექსპერტის მინიჭება"
                           >
-                            <UserPlus size={16} />
+                            <UserPlus size={14} className="sm:w-4 sm:h-4" />
                           </button>
                         )}
                         {/* Close button for assigned officer or manager/admin on in_progress loans */}
                         {canCloseLoan(loan) && (loan.status === 'pending' || loan.status === 'in_progress') && (
                           <button 
-                            className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                            className="p-1.5 sm:p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
                             onClick={() => setClosingLoan(loan)}
                             title="დახურვა"
                           >
-                            <Lock size={16} />
+                            <Lock size={14} className="sm:w-4 sm:h-4" />
                           </button>
                         )}
                       </div>
@@ -655,17 +681,17 @@ export default function Dashboard({ user, onLogout }) {
           
           {/* Pagination */}
           {pagination.pages > 1 && (
-            <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-              <p className="text-sm text-slate-600">
+            <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-xs sm:text-sm text-slate-600">
                 გვერდი {pagination.page} / {pagination.pages} (სულ {pagination.total})
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1.5 sm:p-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
                 </button>
                 {/* Page numbers */}
                 {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
@@ -683,7 +709,7 @@ export default function Dashboard({ user, onLogout }) {
                     <button
                       key={pageNum}
                       onClick={() => setPage(pageNum)}
-                      className={`w-8 h-8 rounded-lg text-sm font-medium ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs sm:text-sm font-medium ${
                         page === pageNum 
                           ? 'bg-blue-600 text-white' 
                           : 'border border-slate-300 hover:bg-slate-50'
@@ -696,9 +722,9 @@ export default function Dashboard({ user, onLogout }) {
                 <button
                   onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
                   disabled={page === pagination.pages}
-                  className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1.5 sm:p-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={14} className="sm:w-4 sm:h-4" />
                 </button>
               </div>
             </div>
@@ -707,11 +733,11 @@ export default function Dashboard({ user, onLogout }) {
 
         {/* Details Modal */}
         {selectedLoan && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-blue-600 text-white">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold">სესხის დეტალები</h3>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex justify-between items-center bg-blue-600 text-white">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h3 className="text-base sm:text-lg font-semibold">სესხის დეტალები</h3>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedLoan.status || 'pending')}`}>
                     {getStatusText(selectedLoan.status || 'pending')}
                   </span>
@@ -744,7 +770,7 @@ export default function Dashboard({ user, onLogout }) {
                           </div>
                           <div>
                             <p className="text-xs text-slate-500">პირადი ნომერი</p>
-                            <p className="font-medium text-slate-800">{details['31'] || '-'}</p>
+                            <p className="font-medium text-slate-800">{maskPersonalId(details['31'], selectedLoan)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-500">მობილური</p>

@@ -287,6 +287,9 @@ async function authenticateWithAD(username, password) {
     return { success: false, fallback: true };
   }
 
+  // Clean username for sAMAccountName search (remove domain if present)
+  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  
   return new Promise((resolve) => {
     const client = ldap.createClient({
       url: `ldap://${settings.adServer}:${settings.adPort}`,
@@ -296,7 +299,7 @@ async function authenticateWithAD(username, password) {
 
     client.on('error', (err) => {
       console.error('LDAP connection error:', err.message);
-      resolve({ success: false, error: 'Connection failed' });
+      resolve({ success: false, error: 'კავშირი ვერ მოხერხდა' });
     });
 
     // Bind with the user's credentials
@@ -306,24 +309,27 @@ async function authenticateWithAD(username, password) {
     
     client.bind(userDN, password, (err) => {
       if (err) {
-        console.log('LDAP bind failed:', err.message);
+        console.log('LDAP bind failed:', err.message, '- Error code:', err.code);
         client.unbind();
-        resolve({ success: false, error: 'Invalid credentials' });
+        resolve({ success: false, error: 'არასწორი პაროლი ან მომხმარებელი' });
         return;
       }
 
-      console.log('LDAP bind successful for:', username);
+      console.log('LDAP bind successful for:', cleanUsername);
       
       // If group filter is set, check membership
       if (settings.adGroupFilter && settings.adBaseDN) {
-        const searchFilter = `(&(sAMAccountName=${username})(memberOf=${settings.adGroupFilter}))`;
+        // First, find the user and get their memberOf attribute
+        const searchFilter = `(sAMAccountName=${cleanUsername})`;
+        console.log('Searching for user:', searchFilter);
         
         client.search(settings.adBaseDN, {
           filter: searchFilter,
           scope: 'sub',
-          attributes: ['dn', 'sAMAccountName', 'displayName', 'mail']
+          attributes: ['dn', 'sAMAccountName', 'displayName', 'mail', 'memberOf']
         }, (searchErr, searchRes) => {
           if (searchErr) {
+            console.log('Search error:', searchErr.message);
             client.unbind();
             resolve({ success: false, error: 'Search failed' });
             return;
@@ -331,6 +337,7 @@ async function authenticateWithAD(username, password) {
 
           let found = false;
           let userInfo = {};
+          let userGroups = [];
 
           searchRes.on('searchEntry', (entry) => {
             found = true;
@@ -339,24 +346,42 @@ async function authenticateWithAD(username, password) {
               displayName: entry.attributes.find(a => a.type === 'displayName')?.values[0],
               mail: entry.attributes.find(a => a.type === 'mail')?.values[0]
             };
+            // Get all groups the user is a member of
+            const memberOfAttr = entry.attributes.find(a => a.type === 'memberOf');
+            userGroups = memberOfAttr?.values || [];
+            console.log('User groups:', userGroups);
           });
 
           searchRes.on('end', () => {
             client.unbind();
             if (found) {
-              resolve({ success: true, userInfo });
+              // Check if user is in the required group (case-insensitive comparison)
+              const requiredGroup = settings.adGroupFilter.toLowerCase();
+              const isInGroup = userGroups.some(g => g.toLowerCase() === requiredGroup || g.toLowerCase().includes(requiredGroup.split(',')[0].toLowerCase()));
+              
+              if (isInGroup) {
+                console.log('User found in required group');
+                resolve({ success: true, userInfo });
+              } else {
+                console.log('User NOT in required group. Required:', settings.adGroupFilter);
+                console.log('User has groups:', userGroups.length > 0 ? userGroups : 'none');
+                resolve({ success: false, error: 'მომხმარებელი არ არის საჭირო ჯგუფში' });
+              }
             } else {
-              resolve({ success: false, error: 'User not in required group' });
+              console.log('User not found in AD search');
+              resolve({ success: false, error: 'მომხმარებელი ვერ მოიძებნა' });
             }
           });
 
-          searchRes.on('error', () => {
+          searchRes.on('error', (err) => {
+            console.log('Search result error:', err.message);
             client.unbind();
             resolve({ success: false, error: 'Search error' });
           });
         });
       } else {
         // No group check needed
+        console.log('No group filter - login allowed');
         client.unbind();
         resolve({ success: true });
       }
@@ -364,59 +389,69 @@ async function authenticateWithAD(username, password) {
   });
 }
 
-// Login Route (AD Auth)
+// Login Route (AD Auth with auto-registration)
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, authMode = 'domain' } = req.body;
+  console.log('Login attempt for:', username, 'mode:', authMode);
   
   // Clean username (remove domain if provided) for database lookup
   const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  console.log('Clean username:', cleanUsername);
   
-  // First check if user exists in our system
+  // LOCAL AUTH MODE
+  if (authMode === 'local') {
+    const user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+    
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'მომხმარებელი არ არის რეგისტრირებული' });
+    }
+    
+    // Check local password
+    if (user.password) {
+      const hashedInput = hashPassword(password);
+      if (hashedInput === user.password) {
+        return res.json({ success: true, user });
+      }
+    }
+    // Default password for testing
+    if (password === 'password') {
+      return res.json({ success: true, user });
+    }
+    
+    return res.status(401).json({ success: false, message: 'არასწორი პაროლი' });
+  }
+  
+  // DOMAIN (AD) AUTH MODE
+  console.log('Domain auth mode - trying AD authentication');
+  const adResult = await authenticateWithAD(username, password);
+  console.log('AD auth result:', JSON.stringify(adResult));
+  
+  if (!adResult.success) {
+    // If AD not configured, suggest local auth
+    if (adResult.fallback) {
+      return res.status(401).json({ success: false, message: 'AD არ არის კონფიგურირებული. გამოიყენეთ ლოკალური ავთენტიფიკაცია.' });
+    }
+    return res.status(401).json({ success: false, message: adResult.error || 'არასწორი მონაცემები' });
+  }
+  
+  // AD auth successful - check if user exists or create them
   let user = await prisma.user.findUnique({ where: { username: cleanUsername } });
   
   if (!user) {
-    return res.status(401).json({ success: false, message: 'მომხმარებელი არ არის რეგისტრირებული სისტემაში' });
-  }
-
-  // Admin users always use local authentication (skip AD)
-  if (user.role === 'admin') {
-    // Check if user has a local password set
-    if (user.password) {
-      const hashedInput = hashPassword(password);
-      if (hashedInput === user.password) {
-        return res.json({ success: true, user });
+    // Auto-register user from AD with default role 'officer'
+    console.log('Auto-registering AD user:', cleanUsername);
+    user = await prisma.user.create({
+      data: {
+        username: cleanUsername,
+        role: 'officer',
+        branches: '' // Will need to be set by admin later
       }
-    }
-    // Default password for admin if not set
-    if (password === 'password') {
-      return res.json({ success: true, user });
-    }
-    return res.status(401).json({ success: false, message: 'არასწორი პაროლი' });
-  }
-
-  // Try AD authentication for non-admin users
-  const adResult = await authenticateWithAD(username, password);
-  
-  if (adResult.success) {
-    return res.json({ success: true, user });
+    });
+    console.log('User auto-registered:', user.username);
   }
   
-  // Fallback: check local password if AD is not configured
-  if (adResult.fallback) {
-    // Check if user has a local password set
-    if (user.password) {
-      const hashedInput = hashPassword(password);
-      if (hashedInput === user.password) {
-        return res.json({ success: true, user });
-      }
-    }
-    // Legacy fallback for testing
-    if (password === 'password') {
-      return res.json({ success: true, user });
-    }
-  }
-  
-  res.status(401).json({ success: false, message: adResult.error || 'არასწორი პაროლი' });
+  console.log('AD login successful for:', user.username);
+  return res.json({ success: true, user });
 });
 
 // Change password (Admin only)
@@ -758,6 +793,15 @@ app.get('/api/loans', async (req, res) => {
   const { userId, role, branches, page = 1, limit = 20, search = '' } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   
+  // If officer/manager has no branches assigned, return empty result
+  if ((role === 'officer' || role === 'manager') && (!branches || branches.trim() === '')) {
+    return res.json({
+      loans: [],
+      pagination: { page: 1, limit: parseInt(limit), total: 0, pages: 0 },
+      noBranches: true
+    });
+  }
+  
   let where = {};
   
   // Search filter
@@ -904,7 +948,57 @@ app.post('/api/loans/:id/assign', async (req, res) => {
   res.json(loan);
 });
 
-// Request to take a loan (by officer)
+// Self-assign loan (officer takes their branch application)
+app.post('/api/loans/:id/take', async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+  
+  try {
+    // Get the officer's info
+    const officer = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
+    if (!officer) {
+      return res.status(404).json({ error: 'მომხმარებელი ვერ მოიძებნა' });
+    }
+    
+    // Get the loan
+    const loan = await prisma.loanApplication.findUnique({ where: { id: parseInt(id) } });
+    if (!loan) {
+      return res.status(404).json({ error: 'განაცხადი ვერ მოიძებნა' });
+    }
+    
+    // Check if loan is already assigned
+    if (loan.assignedToId) {
+      return res.status(400).json({ error: 'განაცხადი უკვე მინიჭებულია' });
+    }
+    
+    // Check if officer's branch matches loan branch
+    const officerBranches = officer.branches ? officer.branches.split(',').map(b => b.trim().toLowerCase()) : [];
+    const loanBranch = loan.branch?.toLowerCase() || '';
+    
+    const branchMatch = officerBranches.some(b => 
+      b === 'all' || loanBranch.includes(b) || b.includes(loanBranch.split(' ')[0])
+    );
+    
+    if (!branchMatch && officerBranches.length > 0) {
+      return res.status(403).json({ error: 'თქვენ ვერ აიღებთ სხვა ფილიალის განაცხადს' });
+    }
+    
+    // Assign the loan to the officer
+    const updatedLoan = await prisma.loanApplication.update({
+      where: { id: parseInt(id) },
+      data: { 
+        assignedToId: parseInt(userId),
+        status: 'in_progress'
+      }
+    });
+    
+    res.json({ success: true, loan: updatedLoan });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Request to take a loan (by officer) - DEPRECATED, kept for backward compatibility
 app.post('/api/loans/:id/request', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.body;
