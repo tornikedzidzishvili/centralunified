@@ -49,7 +49,8 @@ export default function Dashboard({ user, onLogout }) {
     try {
       const res = await api.get('/settings/public');
       if (res.data.logoUrl) {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        // Remove /api from URL for static file access
+        const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/api$/, '');
         setLogoUrl(`${baseUrl}${res.data.logoUrl}`);
       }
     } catch (e) {}

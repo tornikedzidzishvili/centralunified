@@ -218,7 +218,7 @@ export default function Settings({ user, onLogout }) {
                   <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
                     {settings.logoUrl ? (
                       <img 
-                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${settings.logoUrl}`} 
+                        src={`${(import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/api$/, '')}${settings.logoUrl}`} 
                         alt="Logo" 
                         className="w-full h-full object-contain"
                       />
@@ -255,7 +255,7 @@ export default function Settings({ user, onLogout }) {
                   <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
                     {settings.faviconUrl ? (
                       <img 
-                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${settings.faviconUrl}`} 
+                        src={`${(import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/api$/, '')}${settings.faviconUrl}`} 
                         alt="Favicon" 
                         className="w-10 h-10 object-contain"
                       />
