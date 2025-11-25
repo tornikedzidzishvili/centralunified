@@ -378,7 +378,23 @@ app.post('/api/login', async (req, res) => {
     return res.status(401).json({ success: false, message: 'მომხმარებელი არ არის რეგისტრირებული სისტემაში' });
   }
 
-  // Try AD authentication
+  // Admin users always use local authentication (skip AD)
+  if (user.role === 'admin') {
+    // Check if user has a local password set
+    if (user.password) {
+      const hashedInput = hashPassword(password);
+      if (hashedInput === user.password) {
+        return res.json({ success: true, user });
+      }
+    }
+    // Default password for admin if not set
+    if (password === 'password') {
+      return res.json({ success: true, user });
+    }
+    return res.status(401).json({ success: false, message: 'არასწორი პაროლი' });
+  }
+
+  // Try AD authentication for non-admin users
   const adResult = await authenticateWithAD(username, password);
   
   if (adResult.success) {
