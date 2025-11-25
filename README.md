@@ -2,51 +2,79 @@
 
 Internal platform for Central MFO.
 
+## Quick Start (Docker)
+
+```bash
+# Clone and start
+git clone https://github.com/tornikedzidzishvili/centralunified.git
+cd centralunified
+docker-compose up -d --build
+```
+
+Access:
+- **Frontend**: `http://localhost:5173`
+- **API**: `http://localhost:3000`
+- **Default Login**: admin / admin123
+
+## Production Deployment
+
+### First Time Setup
+
+```bash
+# 1. Clone repository
+git clone https://github.com/tornikedzidzishvili/centralunified.git
+cd centralunified
+
+# 2. Configure environment (create .env file)
+cp .env.example .env
+# Edit .env with your Gravity Forms credentials
+
+# 3. Start services
+docker-compose up -d --build
+```
+
+### Update Deployment
+
+```bash
+# Option 1: Use deploy script
+./deploy.sh
+
+# Option 2: Manual
+git pull origin main
+docker-compose down
+docker-compose up -d --build
+```
+
+### Database Management
+
+The database is automatically managed:
+- **On container start**: Schema is synced via `prisma db push`
+- **Data persists**: PostgreSQL data stored in `postgres_data` volume
+- **No manual migrations needed**: Schema changes are applied automatically
+
+```bash
+# Backup database
+docker exec unified-platform-db pg_dump -U central unified_platform > backup.sql
+
+# Restore database
+docker exec -i unified-platform-db psql -U central unified_platform < backup.sql
+
+# View database logs
+docker logs unified-platform-db -f
+
+# Connect to database
+docker exec -it unified-platform-db psql -U central unified_platform
+```
+
 ## Structure
 
-- `server/`: Node.js Express backend with Prisma (SQLite) and LDAP integration.
-- `client/`: React Vite frontend with Tailwind CSS.
+- `server/`: Node.js Express backend with Prisma (PostgreSQL)
+- `client/`: React Vite frontend with Tailwind CSS
+- `docker-compose.yml`: Container orchestration
 
-## Setup
+## Environment Variables
 
-### Backend
-
-1. Navigate to `server` directory:
-   ```bash
-   cd server
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Initialize Database:
-   ```bash
-   npx prisma migrate dev --name init
-   npx prisma generate
-   ```
-4. Start Server:
-   ```bash
-   node index.js
-   ```
-   Server runs on `http://localhost:3000`.
-
-### Frontend
-
-1. Navigate to `client` directory:
-   ```bash
-   cd client
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start Development Server:
-   ```bash
-   npm run dev
-   ```
-   Client runs on `http://localhost:5173`.
-
-## Docker Setup
+Create `.env` file in root directory:
 
 1. Ensure Docker and Docker Compose are installed.
 2. Run the application:

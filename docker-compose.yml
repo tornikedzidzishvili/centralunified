@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:15-alpine
     container_name: unified-platform-db
-    restart: unless-stopped
+    restart: always
     environment:
       POSTGRES_USER: central
       POSTGRES_PASSWORD: central123
@@ -11,10 +11,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central -d unified_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   server:
     build: ./server
     container_name: unified-platform-server
+    restart: always
     ports:
       - "3000:3000"
     environment:
@@ -28,11 +35,13 @@ services:
       - WP_USER=${WP_USER}
       - WP_APP_PASSWORD=${WP_APP_PASSWORD}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   client:
     build: ./client
     container_name: unified-platform-client
+    restart: always
     ports:
       - "5173:80"
     depends_on:

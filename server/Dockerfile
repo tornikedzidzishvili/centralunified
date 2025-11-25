@@ -13,7 +13,11 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 3000
 
-# Start server (use db push for development)
-CMD npx prisma db push && node index.js
+# Use entrypoint script for migrations
+ENTRYPOINT ["/entrypoint.sh"]
