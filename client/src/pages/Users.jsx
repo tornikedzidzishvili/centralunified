@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, LogOut, UserPlus, Building2, Users as UsersIcon, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, LogOut, UserPlus, Building2, Users as UsersIcon, Pencil, Trash2, X, Key, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 export default function Users({ user, onLogout }) {
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({ username: '', role: 'officer', branches: '' });
   const [editingUser, setEditingUser] = useState(null);
+  const [changingPasswordUser, setChangingPasswordUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -51,6 +57,58 @@ export default function Users({ user, onLogout }) {
       fetchUsers();
     } catch (e) {
       alert('Cannot delete user: ' + e.message);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError('პაროლები არ ემთხვევა');
+      return;
+    }
+    
+    if (newPassword.length < 4) {
+      setPasswordError('პაროლი უნდა იყოს მინიმუმ 4 სიმბოლო');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await api.post(`/users/${changingPasswordUser.id}/change-password`, { 
+        newPassword, 
+        adminId: user.id 
+      });
+      alert('პაროლი წარმატებით შეიცვალა');
+      setChangingPasswordUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e) {
+      setPasswordError(e.response?.data?.error || 'შეცდომა პაროლის შეცვლისას');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyADUser = async () => {
+    if (!newUser.username.trim()) {
+      setVerifyResult({ success: false, message: 'შეიყვანეთ მომხმარებლის სახელი' });
+      return;
+    }
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const res = await api.post('/users/verify-ad', { username: newUser.username });
+      setVerifyResult(res.data);
+      // If found, optionally update the username to the AD sAMAccountName
+      if (res.data.success && res.data.user?.sAMAccountName) {
+        setNewUser(prev => ({ ...prev, username: res.data.user.sAMAccountName }));
+      }
+    } catch (e) {
+      setVerifyResult({ success: false, message: 'ვერიფიკაცია ვერ მოხერხდა' });
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -106,49 +164,69 @@ export default function Users({ user, onLogout }) {
             <UserPlus className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-semibold text-slate-800">Add New User</h2>
           </div>
-          <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Username (AD)</label>
-              <input 
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
-                placeholder="e.g. t.genelidze" 
-                value={newUser.username} 
-                onChange={e => setNewUser({...newUser, username: e.target.value})} 
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-              <select 
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
-                value={newUser.role} 
-                onChange={e => setNewUser({...newUser, role: e.target.value})}
-              >
-                <option value="officer">Credit Officer</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Branches</label>
-              <select 
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
-                value={newUser.branches} 
-                onChange={e => setNewUser({...newUser, branches: e.target.value})}
-              >
-                <option value="">Select branch...</option>
-                {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <p className="text-xs text-slate-500 mt-1">Or type multiple: Branch1, Branch2</p>
-            </div>
-            <div className="flex items-end">
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : 'Add User'}
-              </button>
+          <form onSubmit={handleAddUser} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Username (AD)</label>
+                <div className="flex gap-2">
+                  <input 
+                    className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
+                    placeholder="e.g. t.genelidze" 
+                    value={newUser.username} 
+                    onChange={e => { setNewUser({...newUser, username: e.target.value}); setVerifyResult(null); }} 
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyADUser}
+                    disabled={verifying || !newUser.username.trim()}
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                    title="შეამოწმეთ AD-ში"
+                  >
+                    {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  </button>
+                </div>
+                {verifyResult && (
+                  <div className={`mt-2 text-sm flex items-center gap-1 ${verifyResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {verifyResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {verifyResult.message}
+                    {verifyResult.user?.displayName && <span className="text-slate-500 ml-1">({verifyResult.user.displayName})</span>}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                <select 
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
+                  value={newUser.role} 
+                  onChange={e => setNewUser({...newUser, role: e.target.value})}
+                >
+                  <option value="officer">Credit Officer</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Branches</label>
+                <select 
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-slate-50 focus:bg-white" 
+                  value={newUser.branches} 
+                  onChange={e => setNewUser({...newUser, branches: e.target.value})}
+                >
+                  <option value="">Select branch...</option>
+                  {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Or type multiple: Branch1, Branch2</p>
+              </div>
+              <div className="flex items-end">
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Saving...' : 'Add User'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -200,6 +278,57 @@ export default function Users({ user, onLogout }) {
           </div>
         )}
 
+        {/* Change Password Modal */}
+        {changingPasswordUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-slate-800">პაროლის შეცვლა: {changingPasswordUser.username}</h3>
+                <button onClick={() => { setChangingPasswordUser(null); setNewPassword(''); setConfirmPassword(''); setPasswordError(''); }} className="p-1 hover:bg-slate-100 rounded">
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                {passwordError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                    {passwordError}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">ახალი პაროლი</label>
+                  <input 
+                    type="password"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                    value={newPassword} 
+                    onChange={e => setNewPassword(e.target.value)}
+                    required
+                    minLength={4}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">გაიმეორეთ პაროლი</label>
+                  <input 
+                    type="password"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                    value={confirmPassword} 
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={4}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => { setChangingPasswordUser(null); setNewPassword(''); setConfirmPassword(''); setPasswordError(''); }} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    გაუქმება
+                  </button>
+                  <button type="submit" disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg disabled:opacity-50">
+                    {loading ? 'იცვლება...' : 'შეცვლა'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Users Table */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
@@ -241,6 +370,15 @@ export default function Users({ user, onLogout }) {
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
+                        {user.role === 'admin' && (
+                          <button 
+                            onClick={() => setChangingPasswordUser(u)} 
+                            className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="პაროლის შეცვლა"
+                          >
+                            <Key className="w-4 h-4" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleDeleteUser(u.id, u.username)} 
                           className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

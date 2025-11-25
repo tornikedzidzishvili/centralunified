@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const ldap = require('ldapjs');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -11,6 +12,11 @@ const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Simple password hashing
+const hashPassword = (password) => {
+  return crypto.createHash('sha256').update(password).digest('hex');
+};
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -294,7 +300,9 @@ async function authenticateWithAD(username, password) {
     });
 
     // Bind with the user's credentials
-    const userDN = settings.adDomain ? `${username}@${settings.adDomain}` : username;
+    // If username already contains @, use as-is; otherwise append domain
+    const userDN = username.includes('@') ? username : (settings.adDomain ? `${username}@${settings.adDomain}` : username);
+    console.log('Attempting LDAP bind with:', userDN);
     
     client.bind(userDN, password, (err) => {
       if (err) {
@@ -360,8 +368,11 @@ async function authenticateWithAD(username, password) {
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   
+  // Clean username (remove domain if provided) for database lookup
+  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  
   // First check if user exists in our system
-  let user = await prisma.user.findUnique({ where: { username } });
+  let user = await prisma.user.findUnique({ where: { username: cleanUsername } });
   
   if (!user) {
     return res.status(401).json({ success: false, message: 'მომხმარებელი არ არის რეგისტრირებული სისტემაში' });
@@ -374,12 +385,47 @@ app.post('/api/login', async (req, res) => {
     return res.json({ success: true, user });
   }
   
-  // Fallback: if AD is not configured, allow 'password' for testing
-  if (adResult.fallback && password === 'password') {
-    return res.json({ success: true, user });
+  // Fallback: check local password if AD is not configured
+  if (adResult.fallback) {
+    // Check if user has a local password set
+    if (user.password) {
+      const hashedInput = hashPassword(password);
+      if (hashedInput === user.password) {
+        return res.json({ success: true, user });
+      }
+    }
+    // Legacy fallback for testing
+    if (password === 'password') {
+      return res.json({ success: true, user });
+    }
   }
   
   res.status(401).json({ success: false, message: adResult.error || 'არასწორი პაროლი' });
+});
+
+// Change password (Admin only)
+app.post('/api/users/:id/change-password', async (req, res) => {
+  const { id } = req.params;
+  const { newPassword, adminId } = req.body;
+  
+  try {
+    // Check if requester is admin
+    const admin = await prisma.user.findUnique({ where: { id: parseInt(adminId) } });
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ error: 'მხოლოდ ადმინისტრატორს შეუძლია პაროლის შეცვლა' });
+    }
+    
+    const hashedPassword = hashPassword(newPassword);
+    
+    const user = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: { password: hashedPassword }
+    });
+    
+    res.json({ success: true, message: 'პაროლი წარმატებით შეიცვალა' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Get Settings (Admin only)
@@ -575,13 +621,88 @@ app.get('/api/users', async (req, res) => {
   res.json(users);
 });
 
+// Verify user exists in AD
+app.post('/api/users/verify-ad', async (req, res) => {
+  const { username } = req.body;
+  const settings = await prisma.settings.findUnique({ where: { id: 1 } });
+  
+  if (!settings || !settings.adServer || !settings.adBindUser || !settings.adBindPassword) {
+    return res.json({ success: false, message: 'AD არ არის კონფიგურირებული ან Bind credentials არ არის მითითებული' });
+  }
+
+  try {
+    const client = ldap.createClient({
+      url: `ldap://${settings.adServer}:${settings.adPort}`,
+      timeout: 5000,
+      connectTimeout: 5000
+    });
+
+    // Bind with service account
+    const bindDN = settings.adBindUser.includes('@') ? settings.adBindUser : `${settings.adBindUser}@${settings.adDomain}`;
+    
+    client.bind(bindDN, settings.adBindPassword, (bindErr) => {
+      if (bindErr) {
+        console.log('AD bind failed:', bindErr.message);
+        client.unbind();
+        return res.json({ success: false, message: 'AD კავშირი ვერ მოხერხდა' });
+      }
+
+      // Search for user
+      const searchUsername = username.includes('@') ? username.split('@')[0] : username;
+      const searchFilter = `(sAMAccountName=${searchUsername})`;
+      
+      client.search(settings.adBaseDN, {
+        filter: searchFilter,
+        scope: 'sub',
+        attributes: ['sAMAccountName', 'displayName', 'mail', 'userPrincipalName']
+      }, (searchErr, searchRes) => {
+        if (searchErr) {
+          client.unbind();
+          return res.json({ success: false, message: 'ძებნის შეცდომა' });
+        }
+
+        let found = false;
+        let userInfo = {};
+
+        searchRes.on('searchEntry', (entry) => {
+          found = true;
+          userInfo = {
+            sAMAccountName: entry.attributes.find(a => a.type === 'sAMAccountName')?.values[0],
+            displayName: entry.attributes.find(a => a.type === 'displayName')?.values[0],
+            mail: entry.attributes.find(a => a.type === 'mail')?.values[0],
+            userPrincipalName: entry.attributes.find(a => a.type === 'userPrincipalName')?.values[0]
+          };
+        });
+
+        searchRes.on('end', () => {
+          client.unbind();
+          if (found) {
+            res.json({ success: true, user: userInfo, message: 'მომხმარებელი ნაპოვნია AD-ში' });
+          } else {
+            res.json({ success: false, message: 'მომხმარებელი ვერ მოიძებნა AD-ში' });
+          }
+        });
+
+        searchRes.on('error', () => {
+          client.unbind();
+          res.json({ success: false, message: 'ძებნის შეცდომა' });
+        });
+      });
+    });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
 // Create/Update User (Admin)
 app.post('/api/users', async (req, res) => {
   const { username, role, branches } = req.body;
+  // Store username without domain for flexibility
+  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
   const user = await prisma.user.upsert({
-    where: { username },
+    where: { username: cleanUsername },
     update: { role, branches },
-    create: { username, role, branches }
+    create: { username: cleanUsername, role, branches }
   });
   res.json(user);
 });

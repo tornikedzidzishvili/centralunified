@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, Building2 } from 'lucide-react';
@@ -8,7 +8,18 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Fetch public settings to get logo
+    api.get('/settings/public').then(res => {
+      if (res.data.logoUrl) {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        setLogoUrl(`${baseUrl}${res.data.logoUrl}`);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,9 +43,13 @@ export default function Login({ onLogin }) {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-              <Building2 className="w-8 h-8 text-white" />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="h-16 mx-auto mb-4 object-contain" />
+            ) : (
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
+                <Building2 className="w-8 h-8 text-white" />
+              </div>
+            )}
             <h1 className="text-2xl font-bold text-slate-800">Central MFO</h1>
             <p className="text-slate-500 mt-1">Unified Platform</p>
           </div>

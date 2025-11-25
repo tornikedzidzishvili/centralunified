@@ -26,6 +26,7 @@ model Settings {
 model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
+  password  String?  // Local password (hashed)
   adId      String?  @unique // LDAP DN or GUID
   role      String   // "admin", "manager", "officer"
   branches  String   // Comma separated list of branches

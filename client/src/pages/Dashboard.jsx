@@ -13,6 +13,7 @@ export default function Dashboard({ user, onLogout }) {
   const [closingLoan, setClosingLoan] = useState(null);
   const [lastSync, setLastSync] = useState(null);
   const [stats, setStats] = useState({ today: 0, month: 0, pending: 0, approved: 0, rejected: 0 });
+  const [logoUrl, setLogoUrl] = useState('');
   
   // Pagination and search
   const [page, setPage] = useState(1);
@@ -36,11 +37,22 @@ export default function Dashboard({ user, onLogout }) {
     fetchLoans();
     fetchLastSync();
     fetchStats();
+    fetchLogo();
     if (user.role === 'manager' || user.role === 'admin') {
       fetchUsers();
       fetchAssignmentRequests();
     }
   }, [page, search]);
+
+  const fetchLogo = async () => {
+    try {
+      const res = await api.get('/settings/public');
+      if (res.data.logoUrl) {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        setLogoUrl(`${baseUrl}${res.data.logoUrl}`);
+      }
+    } catch (e) {}
+  };
 
   const fetchLoans = async () => {
     setLoading(true);
@@ -251,9 +263,13 @@ export default function Dashboard({ user, onLogout }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="h-10 object-contain" />
+              ) : (
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+              )}
               <div>
                 <h1 className="text-lg font-bold text-slate-800">Central MFO</h1>
                 <p className="text-xs text-slate-500">Unified Platform</p>
