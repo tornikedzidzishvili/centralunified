@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: unified-platform-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: central
+      POSTGRES_PASSWORD: central123
+      POSTGRES_DB: unified_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  server:
+    build: ./server
+    container_name: unified-platform-server
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://central:central123@db:5432/unified_platform?schema=public
+      - PORT=3000
+      - GF_API_URL=${GF_API_URL}
+      - GF_CONSUMER_KEY=${GF_CONSUMER_KEY}
+      - GF_CONSUMER_SECRET=${GF_CONSUMER_SECRET}
+      - GF_FORM_ID=${GF_FORM_ID:-4}
+      - WP_API_URL=${WP_API_URL}
+      - WP_USER=${WP_USER}
+      - WP_APP_PASSWORD=${WP_APP_PASSWORD}
+    depends_on:
+      - db
+
+  client:
+    build: ./client
+    container_name: unified-platform-client
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:

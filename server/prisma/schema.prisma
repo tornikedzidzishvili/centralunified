@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Settings {
+  id        Int      @id @default(1)
+  adServer  String   @default("")
+  adPort    Int      @default(389)
+  adBaseDN  String   @default("")
+  adDomain  String   @default("")
+  adBindUser String  @default("")
+  adBindPassword String @default("")
+  adGroupFilter String @default("")
+  syncInterval Int   @default(5)
+  lastSyncTime DateTime?
+  logoUrl   String   @default("")
+  faviconUrl String  @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  adId      String?  @unique // LDAP DN or GUID
+  role      String   // "admin", "manager", "officer"
+  branches  String   // Comma separated list of branches
+  createdAt DateTime @default(now())
+  
+  assignedApplications LoanApplication[]
+  assignmentRequests   AssignmentRequest[] @relation("RequestedBy")
+  handledRequests      AssignmentRequest[] @relation("HandledBy")
+}
+
+model LoanApplication {
+  id                 Int      @id @default(autoincrement())
+  wpEntryId          String   @unique
+  firstName          String
+  lastName           String
+  email              String
+  mobile             String
+  branch             String
+  verificationStatus Boolean  @default(false)
+  status             String   @default("pending") // "pending", "in_progress", "approved", "rejected"
+  details            String   // JSON string of full details
+  createdAt          DateTime @default(now())
+  closedAt           DateTime?
+  closedById         Int?
+  
+  assignedToId       Int?
+  assignedTo         User?    @relation(fields: [assignedToId], references: [id])
+  
+  assignmentRequests AssignmentRequest[]
+}
+
+model AssignmentRequest {
+  id            Int      @id @default(autoincrement())
+  loanId        Int
+  loan          LoanApplication @relation(fields: [loanId], references: [id])
+  requestedById Int
+  requestedBy   User     @relation("RequestedBy", fields: [requestedById], references: [id])
+  status        String   @default("pending") // "pending", "approved", "rejected"
+  handledById   Int?
+  handledBy     User?    @relation("HandledBy", fields: [handledById], references: [id])
+  handledAt     DateTime?
+  createdAt     DateTime @default(now())
+}
