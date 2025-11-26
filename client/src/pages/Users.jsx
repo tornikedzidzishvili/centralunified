@@ -115,11 +115,23 @@ export default function Users({ user, onLogout }) {
   const getRoleBadge = (role) => {
     const badges = {
       admin: 'bg-purple-100 text-purple-700',
+      admin_editor: 'bg-violet-100 text-violet-700',
       manager: 'bg-blue-100 text-blue-700',
       manager_viewer: 'bg-cyan-100 text-cyan-700',
       officer: 'bg-green-100 text-green-700'
     };
     return badges[role] || 'bg-slate-100 text-slate-700';
+  };
+
+  const getRoleDisplayName = (role) => {
+    const names = {
+      admin: 'ადმინისტრატორი',
+      admin_editor: 'ადმინი (რედაქტორი)',
+      manager: 'მენეჯერი',
+      manager_viewer: 'მენეჯერი (ნახვა)',
+      officer: 'საკრედიტო ოფიცერი'
+    };
+    return names[role] || role;
   };
 
   const branchOptions = [
@@ -205,6 +217,7 @@ export default function Users({ user, onLogout }) {
                   <option value="officer">საკრედიტო ოფიცერი</option>
                   <option value="manager">მენეჯერი</option>
                   <option value="manager_viewer">მენეჯერი (მხოლოდ ნახვა)</option>
+                  <option value="admin_editor">ადმინი (რედაქტორი)</option>
                   <option value="admin">ადმინი</option>
                 </select>
               </div>
@@ -254,6 +267,7 @@ export default function Users({ user, onLogout }) {
                     <option value="officer">საკრედიტო ოფიცერი</option>
                     <option value="manager">მენეჯერი</option>
                     <option value="manager_viewer">მენეჯერი (მხოლოდ ნახვა)</option>
+                    <option value="admin_editor">ადმინი (რედაქტორი)</option>
                     <option value="admin">ადმინი</option>
                   </select>
                 </div>
@@ -354,14 +368,14 @@ export default function Users({ user, onLogout }) {
                   <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${u.role === 'admin' ? 'bg-purple-200' : u.role === 'manager' ? 'bg-blue-200' : u.role === 'manager_viewer' ? 'bg-cyan-200' : 'bg-slate-200'}`}>
+                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${u.role === 'admin' ? 'bg-purple-200' : u.role === 'admin_editor' ? 'bg-violet-200' : u.role === 'manager' ? 'bg-blue-200' : u.role === 'manager_viewer' ? 'bg-cyan-200' : 'bg-slate-200'}`}>
                           <span className="text-xs sm:text-sm font-medium text-slate-600">{u.username[0].toUpperCase()}</span>
                         </div>
                         <span className="font-medium text-slate-800 text-xs sm:text-sm truncate">{u.username}</span>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4">
-                      <span className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getRoleBadge(u.role)}`}>{u.role}</span>
+                      <span className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getRoleBadge(u.role)}`}>{getRoleDisplayName(u.role)}</span>
                     </td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-600 text-xs sm:text-sm">{u.branches || '-'}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4">

@@ -289,6 +289,7 @@ export default function Dashboard({ user, onLogout }) {
   const getRoleBadge = (role) => {
     const badges = {
       admin: 'bg-purple-100 text-purple-700',
+      admin_editor: 'bg-violet-100 text-violet-700',
       manager: 'bg-blue-100 text-blue-700',
       manager_viewer: 'bg-cyan-100 text-cyan-700',
       officer: 'bg-green-100 text-green-700'
@@ -343,8 +344,8 @@ export default function Dashboard({ user, onLogout }) {
   const maskPersonalId = (personalId, loan) => {
     if (!personalId) return '-';
     
-    // manager_viewer always sees masked ID
-    if (user.role === 'manager_viewer') {
+    // manager_viewer and admin_editor always sees masked ID
+    if (user.role === 'manager_viewer' || user.role === 'admin_editor') {
       if (personalId.length <= 4) return personalId;
       return '*'.repeat(personalId.length - 4) + personalId.slice(-4);
     }
@@ -369,6 +370,7 @@ export default function Dashboard({ user, onLogout }) {
   const getRoleDisplayName = (role) => {
     const names = {
       admin: 'ადმინისტრატორი',
+      admin_editor: 'ადმინი (რედაქტორი)',
       manager: 'მენეჯერი',
       manager_viewer: 'მენეჯერი (ნახვა)',
       officer: 'საკრედიტო ოფიცერი'
@@ -411,8 +413,8 @@ export default function Dashboard({ user, onLogout }) {
                   <span className="hidden lg:inline">სესხის ძიება</span>
                 </button>
 
-                {/* Users Management - Admin & Manager Only */}
-                {(user.role === 'admin' || user.role === 'manager') && (
+                {/* Users Management - Admin, Admin Editor & Manager Only */}
+                {(user.role === 'admin' || user.role === 'admin_editor' || user.role === 'manager') && (
                   <Link 
                     to="/users" 
                     className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -423,7 +425,7 @@ export default function Dashboard({ user, onLogout }) {
                   </Link>
                 )}
 
-                {/* Reports - Admin & Manager Viewer Only */}
+                {/* Reports - Admin & Manager Viewer Only (admin_editor excluded) */}
                 {(user.role === 'admin' || user.role === 'manager_viewer') && (
                   <Link 
                     to="/reports" 

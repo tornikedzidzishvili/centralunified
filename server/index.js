@@ -493,13 +493,14 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-// Get public settings (logo, favicon) - no auth required
+// Get public settings (logo, favicon, version) - no auth required
 app.get('/api/settings/public', async (req, res) => {
   try {
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
     res.json({
       logoUrl: settings?.logoUrl || '',
-      faviconUrl: settings?.faviconUrl || ''
+      faviconUrl: settings?.faviconUrl || '',
+      appVersion: settings?.appVersion || '1.0.0'
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -508,7 +509,7 @@ app.get('/api/settings/public', async (req, res) => {
 
 // Update Settings (Admin only)
 app.post('/api/settings', async (req, res) => {
-  const { adServer, adPort, adBaseDN, adDomain, adBindUser, adBindPassword, adGroupFilter, syncInterval } = req.body;
+  const { adServer, adPort, adBaseDN, adDomain, adBindUser, adBindPassword, adGroupFilter, syncInterval, appVersion } = req.body;
   
   try {
     // Get current settings
@@ -527,7 +528,8 @@ app.post('/api/settings', async (req, res) => {
         // Only update password if it's not the masked value
         adBindPassword: adBindPassword === '********' ? current?.adBindPassword || '' : adBindPassword || '',
         adGroupFilter: adGroupFilter || '',
-        syncInterval: newSyncInterval
+        syncInterval: newSyncInterval,
+        appVersion: appVersion || '1.0.0'
       },
       create: {
         id: 1,
@@ -538,7 +540,8 @@ app.post('/api/settings', async (req, res) => {
         adBindUser: adBindUser || '',
         adBindPassword: adBindPassword || '',
         adGroupFilter: adGroupFilter || '',
-        syncInterval: newSyncInterval
+        syncInterval: newSyncInterval,
+        appVersion: appVersion || '1.0.0'
       }
     });
     

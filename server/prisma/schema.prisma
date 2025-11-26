@@ -20,6 +20,7 @@ model Settings {
   lastSyncTime DateTime?
   logoUrl   String   @default("")
   faviconUrl String  @default("")
+  appVersion String  @default("1.0.0")
   updatedAt DateTime @updatedAt
 }
 

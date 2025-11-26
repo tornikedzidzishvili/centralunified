@@ -29,7 +29,7 @@ function App() {
         />
         <Route 
           path="/users" 
-          element={user && user.role === 'admin' ? <Users user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
+          element={user && (user.role === 'admin' || user.role === 'admin_editor') ? <Users user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
         />
         <Route 
           path="/settings" 

@@ -9,16 +9,20 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
+  const [appVersion, setAppVersion] = useState('');
   const [authMode, setAuthMode] = useState('domain'); // 'domain' or 'local'
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Fetch public settings to get logo
+    // Fetch public settings to get logo and version
     api.get('/settings/public').then(res => {
       if (res.data.logoUrl) {
         // Remove /api from URL for static file access
         const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/api$/, '');
         setLogoUrl(`${baseUrl}${res.data.logoUrl}`);
+      }
+      if (res.data.appVersion) {
+        setAppVersion(res.data.appVersion);
       }
     }).catch(() => {});
   }, []);
@@ -122,7 +126,12 @@ export default function Login({ onLogin }) {
             </button>
           </form>
         </div>
-        <p className="text-center text-slate-500 text-xs sm:text-sm mt-4 sm:mt-6">© 2025 Central MFO. ყველა უფლება დაცულია.</p>
+        <div className="text-center mt-4 sm:mt-6">
+          <p className="text-slate-500 text-xs sm:text-sm">© 2025 Central MFO. ყველა უფლება დაცულია.</p>
+          {appVersion && (
+            <p className="text-slate-400 text-xs mt-1">ვერსია {appVersion}</p>
+          )}
+        </div>
       </div>
     </div>
   );

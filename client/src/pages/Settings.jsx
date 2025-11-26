@@ -14,7 +14,8 @@ export default function Settings({ user, onLogout }) {
     adGroupFilter: '',
     syncInterval: 5,
     logoUrl: '',
-    faviconUrl: ''
+    faviconUrl: '',
+    appVersion: '1.0.0'
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -284,6 +285,19 @@ export default function Settings({ user, onLogout }) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* App Version */}
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <label className="block text-sm font-medium text-slate-700 mb-2">აპლიკაციის ვერსია</label>
+              <input
+                type="text"
+                value={settings.appVersion || ''}
+                onChange={e => setSettings({ ...settings, appVersion: e.target.value })}
+                placeholder="მაგ: 1.0.0"
+                className="w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">ეს ვერსია გამოჩნდება ლოგინის გვერდზე</p>
             </div>
           </div>
         </div>
