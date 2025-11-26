@@ -531,22 +531,6 @@ export default function Dashboard({ user, onLogout }) {
                       {getStatusLabel(loanSearchResult.status)}
                     </span>
                   </div>
-                  
-                  {/* Admin Reassign Button */}
-                  {user.role === 'admin' && loanSearchResult.id !== undefined && (
-                    <div className="pt-3 border-t border-slate-200">
-                      <button
-                        onClick={() => {
-                          setReassigningLoan(loanSearchResult);
-                          setShowLoanSearch(false);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors"
-                      >
-                        <RefreshCw size={16} />
-                        გადანაწილება
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1062,22 +1046,42 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               )}
               
-              {/* Footer Buttons - Assign/Close */}
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-                {(user.role === 'admin' || user.role === 'manager') && !selectedLoan.assignedTo && selectedLoan.status === 'pending' && (
+              {/* Footer Buttons - Assign/Reassign/Close */}
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
+                <div>
+                  {/* Admin Reassign Button */}
+                  {user.role === 'admin' && (
+                    <button 
+                      onClick={() => {
+                        setReassigningLoan({
+                          id: selectedLoan.id,
+                          branch: selectedLoan.branch,
+                          expert: selectedLoan.assignedTo?.username || null
+                        });
+                        setSelectedLoan(null);
+                      }}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      გადანაწილება
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  {(user.role === 'admin' || user.role === 'manager') && !selectedLoan.assignedTo && selectedLoan.status === 'pending' && (
+                    <button 
+                      onClick={() => { setSelectedLoan(null); setAssigningLoan(selectedLoan); }}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      მინიჭება ოფიცერზე
+                    </button>
+                  )}
                   <button 
-                    onClick={() => { setSelectedLoan(null); setAssigningLoan(selectedLoan); }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                    onClick={() => setSelectedLoan(null)}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
                   >
-                    მინიჭება ოფიცერზე
+                    დახურვა
                   </button>
-                )}
-                <button 
-                  onClick={() => setSelectedLoan(null)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
-                >
-                  დახურვა
-                </button>
+                </div>
               </div>
             </div>
           </div>
