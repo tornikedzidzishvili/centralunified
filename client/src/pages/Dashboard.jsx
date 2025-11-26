@@ -37,6 +37,9 @@ export default function Dashboard({ user, onLogout }) {
   // Date range filter (for manager/admin)
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  
+  // Verified filter
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   useEffect(() => {
     fetchLoans();
@@ -47,7 +50,7 @@ export default function Dashboard({ user, onLogout }) {
       fetchUsers();
       fetchAssignmentRequests();
     }
-  }, [page, search, dateFrom, dateTo]);
+  }, [page, search, dateFrom, dateTo, verifiedOnly]);
 
   const fetchLogo = async () => {
     try {
@@ -72,7 +75,8 @@ export default function Dashboard({ user, onLogout }) {
           limit: 20,
           search,
           dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined
+          dateTo: dateTo || undefined,
+          verifiedOnly: verifiedOnly || undefined
         } 
       });
       setLoans(res.data.loans);
@@ -543,9 +547,22 @@ export default function Dashboard({ user, onLogout }) {
 
         <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">განაცხადები</h2>
-              <p className="text-slate-500 text-sm mt-0.5">{pagination.total} განაცხადი ნაპოვნია</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800">განაცხადები</h2>
+                <p className="text-slate-500 text-sm mt-0.5">{pagination.total} განაცხადი ნაპოვნია</p>
+              </div>
+              <button
+                onClick={() => { setVerifiedOnly(!verifiedOnly); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  verifiedOnly 
+                    ? 'bg-green-100 text-green-700 border border-green-300' 
+                    : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                <ShieldCheck size={16} />
+                ვერიფიცირებული
+              </button>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {/* Search */}

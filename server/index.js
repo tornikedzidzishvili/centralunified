@@ -790,7 +790,7 @@ ensureAdminUser();
 
 // Get Loan Applications with pagination and search
 app.get('/api/loans', async (req, res) => {
-  const { userId, role, branches, page = 1, limit = 20, search = '', dateFrom, dateTo } = req.query;
+  const { userId, role, branches, page = 1, limit = 20, search = '', dateFrom, dateTo, verifiedOnly } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   
   // If officer/manager has no branches assigned, return empty result
@@ -818,6 +818,11 @@ app.get('/api/loans', async (req, res) => {
     }
   }
   
+  // Verified filter
+  if (verifiedOnly === 'true') {
+    where.verificationStatus = true;
+  }
+  
   // Search filter
   if (search) {
     where.OR = [
@@ -830,12 +835,14 @@ app.get('/api/loans', async (req, res) => {
   
   if (role === 'officer') {
     // Officers see: pending unassigned loans in their branch + their own assigned loans
+    // Applications assigned to OTHER officers are hidden from this officer
     const userBranchList = branches ? branches.split(',') : [];
     where.AND = [
       search ? { OR: where.OR } : {},
+      verifiedOnly === 'true' ? { verificationStatus: true } : {},
       {
         OR: [
-          // Pending unassigned loans in their branch
+          // Pending unassigned loans in their branch (available to take)
           { 
             status: 'pending',
             assignedToId: null,
@@ -850,6 +857,8 @@ app.get('/api/loans', async (req, res) => {
       }
     ];
     delete where.OR;
+    // Remove verificationStatus from top-level where since it's in AND
+    delete where.verificationStatus;
   } else if (role === 'manager') {
     // Filter by branch (unless manager has access to all branches)
     const userBranches = branches ? branches.split(',') : [];
