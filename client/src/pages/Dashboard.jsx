@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { CheckCircle, XCircle, Eye, Users, LogOut, FileText, Building2, RefreshCw, X, UserPlus, Calendar, TrendingUp, Clock, ThumbsUp, ThumbsDown, Settings, Lock, ShieldCheck, ShieldX, Search, ChevronLeft, ChevronRight, Hand, Bell, Phone, CreditCard, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Users, LogOut, FileText, Building2, RefreshCw, X, UserPlus, Calendar, TrendingUp, Clock, ThumbsUp, ThumbsDown, Settings, Lock, ShieldCheck, ShieldX, Search, ChevronLeft, ChevronRight, Hand, Bell, Phone, CreditCard, Loader2, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard({ user, onLogout }) {
@@ -420,6 +420,18 @@ export default function Dashboard({ user, onLogout }) {
                   >
                     <Users size={15} className="sm:w-4 sm:h-4" /> 
                     <span className="hidden lg:inline">მომხმარებლები</span>
+                  </Link>
+                )}
+
+                {/* Reports - Admin & Manager Viewer Only */}
+                {(user.role === 'admin' || user.role === 'manager_viewer') && (
+                  <Link 
+                    to="/reports" 
+                    className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                    title="რეპორტები"
+                  >
+                    <BarChart3 size={15} className="sm:w-4 sm:h-4" /> 
+                    <span className="hidden lg:inline">რეპორტები</span>
                   </Link>
                 )}
 

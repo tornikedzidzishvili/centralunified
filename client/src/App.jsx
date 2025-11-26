@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Reports from './pages/Reports';
 import { useState } from 'react';
 
 function App() {
@@ -33,6 +34,10 @@ function App() {
         <Route 
           path="/settings" 
           element={user && user.role === 'admin' ? <Settings user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
+        />
+        <Route 
+          path="/reports" 
+          element={user && (user.role === 'admin' || user.role === 'manager_viewer') ? <Reports user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
         />
       </Routes>
     </Router>

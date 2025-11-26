@@ -1305,6 +1305,145 @@ app.get('/api/loans/stats', async (req, res) => {
   });
 });
 
+// Reports Dashboard API
+app.get('/api/reports/dashboard', async (req, res) => {
+  const { branch } = req.query;
+  const now = new Date();
+  
+  // Date calculations
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  
+  // Branch filter
+  let branchFilter = {};
+  if (branch && branch !== 'all') {
+    branchFilter = { branch };
+  }
+  
+  try {
+    // Basic counts
+    const [today, thisMonth, lastMonth, thisYear] = await Promise.all([
+      prisma.loanApplication.count({
+        where: { createdAt: { gte: startOfDay }, ...branchFilter }
+      }),
+      prisma.loanApplication.count({
+        where: { createdAt: { gte: startOfMonth }, ...branchFilter }
+      }),
+      prisma.loanApplication.count({
+        where: { 
+          createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
+          ...branchFilter 
+        }
+      }),
+      prisma.loanApplication.count({
+        where: { createdAt: { gte: startOfYear }, ...branchFilter }
+      })
+    ]);
+    
+    // Monthly trend percentage
+    const monthlyTrend = lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : (thisMonth > 0 ? 100 : 0);
+    
+    // Status distribution
+    const statusCounts = await prisma.loanApplication.groupBy({
+      by: ['status'],
+      _count: { status: true },
+      where: { createdAt: { gte: startOfYear }, ...branchFilter }
+    });
+    
+    const statusLabels = {
+      pending: 'მოლოდინში',
+      in_progress: 'მუშავდება',
+      approved: 'დამტკიცებული',
+      rejected: 'უარყოფილი',
+      cancelled: 'გაუქმებული'
+    };
+    
+    const statusDistribution = statusCounts.map(s => ({
+      status: statusLabels[s.status] || s.status,
+      statusKey: s.status,
+      count: s._count.status
+    }));
+    
+    // Branch distribution (only if viewing all branches)
+    let branchDistribution = [];
+    if (!branch || branch === 'all') {
+      const branchCounts = await prisma.loanApplication.groupBy({
+        by: ['branch'],
+        _count: { branch: true },
+        where: { createdAt: { gte: startOfYear } },
+        orderBy: { _count: { branch: 'desc' } }
+      });
+      branchDistribution = branchCounts.map(b => ({
+        branch: b.branch,
+        count: b._count.branch
+      }));
+    }
+    
+    // Product distribution (from details JSON field '16')
+    const allLoans = await prisma.loanApplication.findMany({
+      where: { createdAt: { gte: startOfYear }, ...branchFilter },
+      select: { details: true }
+    });
+    
+    const productCounts = {};
+    allLoans.forEach(loan => {
+      try {
+        const details = JSON.parse(loan.details || '{}');
+        const product = details['16'] || 'სხვა';
+        productCounts[product] = (productCounts[product] || 0) + 1;
+      } catch (e) {
+        productCounts['სხვა'] = (productCounts['სხვა'] || 0) + 1;
+      }
+    });
+    
+    const productDistribution = Object.entries(productCounts)
+      .map(([product, count]) => ({ product, count }))
+      .sort((a, b) => b.count - a.count);
+    
+    const mostRequestedProduct = productDistribution[0] || null;
+    
+    // Monthly data for trend chart (last 12 months)
+    const monthlyData = [];
+    const monthNames = ['იან', 'თებ', 'მარ', 'აპრ', 'მაი', 'ივნ', 'ივლ', 'აგვ', 'სექ', 'ოქტ', 'ნოე', 'დეკ'];
+    
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      
+      const count = await prisma.loanApplication.count({
+        where: {
+          createdAt: { gte: monthStart, lte: monthEnd },
+          ...branchFilter
+        }
+      });
+      
+      monthlyData.push({
+        month: monthNames[monthStart.getMonth()],
+        count
+      });
+    }
+    
+    res.json({
+      today,
+      thisMonth,
+      lastMonth,
+      thisYear,
+      monthlyTrend,
+      statusDistribution,
+      branchDistribution,
+      productDistribution,
+      mostRequestedProduct,
+      monthlyData
+    });
+  } catch (e) {
+    console.error('Reports error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Webhook for WordPress (Gravity Forms) - Real-time updates
 app.post('/api/webhook/gravity-forms', async (req, res) => {
   const data = req.body;
