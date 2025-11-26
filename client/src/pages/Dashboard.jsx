@@ -49,6 +49,9 @@ export default function Dashboard({ user, onLogout }) {
     if (user.role === 'manager' || user.role === 'admin') {
       fetchUsers();
       fetchAssignmentRequests();
+    } else if (user.role === 'manager_viewer') {
+      // manager_viewer can see user list for officer assignment display but no requests
+      fetchUsers();
     }
   }, [page, search, dateFrom, dateTo, verifiedOnly]);
 
@@ -215,6 +218,7 @@ export default function Dashboard({ user, onLogout }) {
 
   const canCloseLoan = (loan) => {
     // Admin, Manager, or assigned officer can close the loan
+    // manager_viewer cannot close loans (read-only)
     if (user.role === 'admin' || user.role === 'manager') return true;
     if (user.role === 'officer' && loan.assignedToId === user.id) return true;
     return false;
@@ -224,6 +228,7 @@ export default function Dashboard({ user, onLogout }) {
     const badges = {
       admin: 'bg-purple-100 text-purple-700',
       manager: 'bg-blue-100 text-blue-700',
+      manager_viewer: 'bg-cyan-100 text-cyan-700',
       officer: 'bg-green-100 text-green-700'
     };
     return badges[role] || 'bg-slate-100 text-slate-700';
@@ -272,6 +277,12 @@ export default function Dashboard({ user, onLogout }) {
   // Mask personal ID - show only last 4 digits if loan is not taken
   const maskPersonalId = (personalId, loan) => {
     if (!personalId) return '-';
+    
+    // manager_viewer always sees masked ID
+    if (user.role === 'manager_viewer') {
+      if (personalId.length <= 4) return personalId;
+      return '*'.repeat(personalId.length - 4) + personalId.slice(-4);
+    }
     
     // Show full ID if loan is assigned (taken by an officer)
     if (loan?.assignedToId) {
@@ -592,8 +603,8 @@ export default function Dashboard({ user, onLogout }) {
             </div>
           </div>
           
-          {/* Date Range Filter for Manager/Admin */}
-          {(user.role === 'manager' || user.role === 'admin') && (
+          {/* Date Range Filter for Manager/Manager_Viewer/Admin */}
+          {(user.role === 'manager' || user.role === 'manager_viewer' || user.role === 'admin') && (
             <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <Calendar size={16} className="text-slate-500" />
               <span className="text-sm text-slate-600 font-medium">თარიღის ფილტრი:</span>

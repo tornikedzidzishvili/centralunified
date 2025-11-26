@@ -28,7 +28,7 @@ model User {
   username  String   @unique
   password  String?  // Local password (hashed)
   adId      String?  @unique // LDAP DN or GUID
-  role      String   // "admin", "manager", "officer"
+  role      String   // "admin", "manager", "manager_viewer", "officer"
   branches  String   // Comma separated list of branches
   createdAt DateTime @default(now())
   

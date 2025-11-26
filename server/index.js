@@ -866,6 +866,9 @@ app.get('/api/loans', async (req, res) => {
     if (!hasAllBranches) {
       where.branch = { in: userBranches };
     }
+  } else if (role === 'manager_viewer') {
+    // manager_viewer sees all applications (like admin) but read-only
+    // No branch filtering - sees everything
   }
   // Admin sees all
   
