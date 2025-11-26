@@ -300,12 +300,24 @@ export default function Dashboard({ user, onLogout }) {
     return masked;
   };
 
+  // Get role display name in Georgian
+  const getRoleDisplayName = (role) => {
+    const names = {
+      admin: 'ადმინისტრატორი',
+      manager: 'მენეჯერი',
+      manager_viewer: 'მენეჯერი (ნახვა)',
+      officer: 'საკრედიტო ოფიცერი'
+    };
+    return names[role] || role;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
+            {/* Logo & Brand */}
             <div className="flex items-center gap-2 sm:gap-3">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="h-8 sm:h-10 object-contain" />
@@ -319,39 +331,70 @@ export default function Dashboard({ user, onLogout }) {
                 <p className="text-xs text-slate-500 hidden sm:block">Unified Platform</p>
               </div>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs sm:text-sm font-medium text-slate-600">{user.username[0].toUpperCase()}</span>
+
+            {/* Navigation & Actions */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Action Menu Items - Role Based */}
+              <nav className="flex items-center gap-1 sm:gap-1.5 mr-1 sm:mr-2 pr-1 sm:pr-2 border-r border-slate-200">
+                {/* Loan Search - All Roles */}
+                <button 
+                  onClick={() => { setShowLoanSearch(true); resetLoanSearch(); }} 
+                  className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  title="სესხის ძიება"
+                >
+                  <Search size={15} className="sm:w-4 sm:h-4" /> 
+                  <span className="hidden lg:inline">სესხის ძიება</span>
+                </button>
+
+                {/* Users Management - Admin & Manager Only */}
+                {(user.role === 'admin' || user.role === 'manager') && (
+                  <Link 
+                    to="/users" 
+                    className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="მომხმარებლები"
+                  >
+                    <Users size={15} className="sm:w-4 sm:h-4" /> 
+                    <span className="hidden lg:inline">მომხმარებლები</span>
+                  </Link>
+                )}
+
+                {/* Settings - Admin Only */}
+                {user.role === 'admin' && (
+                  <Link 
+                    to="/settings" 
+                    className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" 
+                    title="პარამეტრები"
+                  >
+                    <Settings size={15} className="sm:w-4 sm:h-4" />
+                    <span className="hidden lg:inline">პარამეტრები</span>
+                  </Link>
+                )}
+              </nav>
+
+              {/* User Profile */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs sm:text-sm font-medium text-slate-600">{user.username[0].toUpperCase()}</span>
+                  </div>
+                  <div className="hidden md:block text-right">
+                    <p className="text-sm font-medium text-slate-700">{user.username}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${getRoleBadge(user.role)}`}>
+                      {getRoleDisplayName(user.role)}
+                    </span>
+                  </div>
                 </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium text-slate-700">{user.username}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadge(user.role)}`}>{user.role}</span>
-                </div>
+
+                {/* Logout */}
+                <button 
+                  onClick={onLogout} 
+                  className="flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="გასვლა"
+                >
+                  <LogOut size={15} className="sm:w-4 sm:h-4" /> 
+                  <span className="hidden sm:inline">გასვლა</span>
+                </button>
               </div>
-              {(user.role === 'admin' || user.role === 'manager') && (
-                <Link to="/users" className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                  <Users size={14} className="sm:w-4 sm:h-4" /> 
-                  <span className="hidden sm:inline">მომხმარებლები</span>
-                </Link>
-              )}
-              {user.role === 'admin' && (
-                <Link to="/settings" className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="პარამეტრები">
-                  <Settings size={16} className="sm:w-[18px] sm:h-[18px]" />
-                </Link>
-              )}
-              <button 
-                onClick={() => { setShowLoanSearch(true); resetLoanSearch(); }} 
-                className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                title="სესხის ძიება"
-              >
-                <Search size={14} className="sm:w-4 sm:h-4" /> 
-                <span className="hidden md:inline">სესხის ძიება</span>
-              </button>
-              <button onClick={onLogout} className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                <LogOut size={14} className="sm:w-4 sm:h-4" /> 
-                <span className="hidden sm:inline">გასვლა</span>
-              </button>
             </div>
           </div>
         </div>
