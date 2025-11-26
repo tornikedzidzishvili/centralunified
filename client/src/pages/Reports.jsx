@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { 
   BarChart3, TrendingUp, TrendingDown, Calendar, FileText, 
   Building2, LogOut, Settings, Users, Home, Filter, RefreshCw,
-  ArrowUpRight, ArrowDownRight, Minus
+  ArrowUpRight, ArrowDownRight, Minus, CheckCircle, XCircle, Clock, Ban
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -15,6 +15,8 @@ export default function Reports({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
 
   const branchOptions = [
@@ -31,7 +33,7 @@ export default function Reports({ user, onLogout }) {
   useEffect(() => {
     fetchLogo();
     fetchReportData();
-  }, [selectedBranch]);
+  }, [selectedBranch, dateFrom, dateTo]);
 
   const fetchLogo = async () => {
     try {
@@ -50,6 +52,12 @@ export default function Reports({ user, onLogout }) {
       if (selectedBranch !== 'all') {
         params.append('branch', selectedBranch);
       }
+      if (dateFrom) {
+        params.append('dateFrom', dateFrom);
+      }
+      if (dateTo) {
+        params.append('dateTo', dateTo);
+      }
       const res = await api.get(`/reports/dashboard?${params.toString()}`);
       setReportData(res.data);
     } catch (e) {
@@ -57,6 +65,24 @@ export default function Reports({ user, onLogout }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearFilters = () => {
+    setSelectedBranch('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const hasDateFilter = dateFrom || dateTo;
+  const getDateRangeLabel = () => {
+    if (dateFrom && dateTo) {
+      return `${dateFrom} - ${dateTo}`;
+    } else if (dateFrom) {
+      return `${dateFrom}-დან`;
+    } else if (dateTo) {
+      return `${dateTo}-მდე`;
+    }
+    return '';
   };
 
   const getTrendIcon = (percentage) => {
@@ -157,7 +183,9 @@ export default function Reports({ user, onLogout }) {
               <Filter size={18} className="text-slate-500" />
               <span className="text-sm font-medium text-slate-700">ფილტრი:</span>
             </div>
-            <div className="flex-1 max-w-xs">
+            
+            {/* Branch Filter */}
+            <div className="w-full sm:w-auto sm:flex-1 sm:max-w-xs">
               <select
                 value={selectedBranch}
                 onChange={(e) => setSelectedBranch(e.target.value)}
@@ -168,14 +196,61 @@ export default function Reports({ user, onLogout }) {
                 ))}
               </select>
             </div>
-            <button
-              onClick={fetchReportData}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-            >
-              <RefreshCw size={16} />
-              განახლება
-            </button>
+
+            {/* Date From */}
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-slate-400" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                placeholder="თარიღიდან"
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">—</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                placeholder="თარიღამდე"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchReportData}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+              >
+                <RefreshCw size={16} />
+                განახლება
+              </button>
+              {(selectedBranch !== 'all' || dateFrom || dateTo) && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors text-sm"
+                >
+                  გასუფთავება
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Active Filters Summary */}
+          {(selectedBranch !== 'all' || hasDateFilter) && (
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <p className="text-xs text-slate-500">
+                აქტიური ფილტრები: 
+                {selectedBranch !== 'all' && <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded">{selectedBranch}</span>}
+                {hasDateFilter && <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded">{getDateRangeLabel()}</span>}
+              </p>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -184,6 +259,36 @@ export default function Reports({ user, onLogout }) {
           </div>
         ) : reportData ? (
           <>
+            {/* Date Range Stats (shown when date filter is active) */}
+            {hasDateFilter && reportData.dateRangeStats && (
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-5 mb-6 text-white">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-purple-100 text-sm">არჩეული პერიოდი: {getDateRangeLabel()}</p>
+                    <p className="text-3xl font-bold mt-1">{reportData.dateRangeStats.total} განაცხადი</p>
+                  </div>
+                  <div className="flex flex-wrap gap-6">
+                    <div className="text-center">
+                      <p className="text-purple-100 text-xs">დამტკიცებული</p>
+                      <p className="text-2xl font-bold text-green-300">{reportData.dateRangeStats.approved}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-purple-100 text-xs">უარყოფილი</p>
+                      <p className="text-2xl font-bold text-red-300">{reportData.dateRangeStats.rejected}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-purple-100 text-xs">გაუქმებული</p>
+                      <p className="text-2xl font-bold text-slate-300">{reportData.dateRangeStats.cancelled}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-purple-100 text-xs">მოლოდინში</p>
+                      <p className="text-2xl font-bold text-amber-300">{reportData.dateRangeStats.pending}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Key Metrics Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {/* Today */}
@@ -236,6 +341,61 @@ export default function Reports({ user, onLogout }) {
                 <p className="text-sm text-slate-500 mb-1">წინა თვე</p>
                 <p className="text-3xl font-bold text-slate-800">{reportData.lastMonth}</p>
                 <p className="text-xs text-slate-400 mt-1">განაცხადი</p>
+              </div>
+            </div>
+
+            {/* Status Stats Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              {/* Approved */}
+              <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-green-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">დამტკიცებული</p>
+                    <p className="text-2xl font-bold text-green-600">{reportData.approvedCount || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rejected */}
+              <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-red-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">უარყოფილი</p>
+                    <p className="text-2xl font-bold text-red-600">{reportData.rejectedCount || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cancelled */}
+              <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-slate-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                    <Ban className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">გაუქმებული</p>
+                    <p className="text-2xl font-bold text-slate-600">{reportData.cancelledCount || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending */}
+              <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-amber-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">მოლოდინში</p>
+                    <p className="text-2xl font-bold text-amber-600">{reportData.pendingCount || 0}</p>
+                  </div>
+                </div>
               </div>
             </div>
 

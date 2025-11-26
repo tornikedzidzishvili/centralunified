@@ -1307,7 +1307,7 @@ app.get('/api/loans/stats', async (req, res) => {
 
 // Reports Dashboard API
 app.get('/api/reports/dashboard', async (req, res) => {
-  const { branch } = req.query;
+  const { branch, dateFrom, dateTo } = req.query;
   const now = new Date();
   
   // Date calculations
@@ -1321,6 +1321,20 @@ app.get('/api/reports/dashboard', async (req, res) => {
   let branchFilter = {};
   if (branch && branch !== 'all') {
     branchFilter = { branch };
+  }
+  
+  // Date range filter for custom queries
+  let dateRangeFilter = {};
+  if (dateFrom || dateTo) {
+    dateRangeFilter.createdAt = {};
+    if (dateFrom) {
+      dateRangeFilter.createdAt.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      dateRangeFilter.createdAt.lte = endDate;
+    }
   }
   
   try {
@@ -1345,6 +1359,36 @@ app.get('/api/reports/dashboard', async (req, res) => {
     
     // Monthly trend percentage
     const monthlyTrend = lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : (thisMonth > 0 ? 100 : 0);
+    
+    // Status counts (yearly)
+    const [approvedCount, rejectedCount, cancelledCount, pendingCount] = await Promise.all([
+      prisma.loanApplication.count({
+        where: { status: 'approved', createdAt: { gte: startOfYear }, ...branchFilter }
+      }),
+      prisma.loanApplication.count({
+        where: { status: 'rejected', createdAt: { gte: startOfYear }, ...branchFilter }
+      }),
+      prisma.loanApplication.count({
+        where: { status: 'cancelled', createdAt: { gte: startOfYear }, ...branchFilter }
+      }),
+      prisma.loanApplication.count({
+        where: { status: { in: ['pending', 'in_progress'] }, createdAt: { gte: startOfYear }, ...branchFilter }
+      })
+    ]);
+    
+    // Date range stats (if date filter is active)
+    let dateRangeStats = null;
+    if (dateFrom || dateTo) {
+      const combinedFilter = { ...branchFilter, ...dateRangeFilter };
+      const [total, approved, rejected, cancelled, pending] = await Promise.all([
+        prisma.loanApplication.count({ where: combinedFilter }),
+        prisma.loanApplication.count({ where: { ...combinedFilter, status: 'approved' } }),
+        prisma.loanApplication.count({ where: { ...combinedFilter, status: 'rejected' } }),
+        prisma.loanApplication.count({ where: { ...combinedFilter, status: 'cancelled' } }),
+        prisma.loanApplication.count({ where: { ...combinedFilter, status: { in: ['pending', 'in_progress'] } } })
+      ]);
+      dateRangeStats = { total, approved, rejected, cancelled, pending };
+    }
     
     // Status distribution
     const statusCounts = await prisma.loanApplication.groupBy({
@@ -1383,8 +1427,13 @@ app.get('/api/reports/dashboard', async (req, res) => {
     }
     
     // Product distribution (from details JSON field '16')
+    // Use date range if provided, otherwise yearly
+    const productFilter = (dateFrom || dateTo) 
+      ? { ...branchFilter, ...dateRangeFilter }
+      : { createdAt: { gte: startOfYear }, ...branchFilter };
+      
     const allLoans = await prisma.loanApplication.findMany({
-      where: { createdAt: { gte: startOfYear }, ...branchFilter },
+      where: productFilter,
       select: { details: true }
     });
     
@@ -1432,6 +1481,11 @@ app.get('/api/reports/dashboard', async (req, res) => {
       lastMonth,
       thisYear,
       monthlyTrend,
+      approvedCount,
+      rejectedCount,
+      cancelledCount,
+      pendingCount,
+      dateRangeStats,
       statusDistribution,
       branchDistribution,
       productDistribution,
