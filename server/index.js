@@ -790,7 +790,7 @@ ensureAdminUser();
 
 // Get Loan Applications with pagination and search
 app.get('/api/loans', async (req, res) => {
-  const { userId, role, branches, page = 1, limit = 20, search = '' } = req.query;
+  const { userId, role, branches, page = 1, limit = 20, search = '', dateFrom, dateTo } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   
   // If officer/manager has no branches assigned, return empty result
@@ -803,6 +803,20 @@ app.get('/api/loans', async (req, res) => {
   }
   
   let where = {};
+  
+  // Date range filter
+  if (dateFrom || dateTo) {
+    where.createdAt = {};
+    if (dateFrom) {
+      where.createdAt.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      // Set to end of day
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      where.createdAt.lte = endDate;
+    }
+  }
   
   // Search filter
   if (search) {
