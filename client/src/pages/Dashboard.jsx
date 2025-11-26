@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { CheckCircle, XCircle, Eye, Users, LogOut, FileText, Building2, RefreshCw, X, UserPlus, Calendar, TrendingUp, Clock, ThumbsUp, ThumbsDown, Settings, Lock, ShieldCheck, Search, ChevronLeft, ChevronRight, Hand, Bell, Phone, CreditCard, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Users, LogOut, FileText, Building2, RefreshCw, X, UserPlus, Calendar, TrendingUp, Clock, ThumbsUp, ThumbsDown, Settings, Lock, ShieldCheck, ShieldX, Search, ChevronLeft, ChevronRight, Hand, Bell, Phone, CreditCard, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard({ user, onLogout }) {
@@ -647,9 +647,13 @@ export default function Dashboard({ user, onLogout }) {
                           <p className="font-medium text-slate-800 text-xs sm:text-sm truncate">{loan.firstName} {loan.lastName}</p>
                           <p className="text-[10px] sm:text-xs text-slate-500 truncate">{loan.email || ''}</p>
                         </div>
-                        {loan.verificationStatus && (
+                        {loan.verificationStatus ? (
                           <span title="CreditInfo ვერიფიცირებული" className="flex-shrink-0">
                             <ShieldCheck size={16} className="text-green-500" />
+                          </span>
+                        ) : (
+                          <span title="CreditInfo არავერიფიცირებული" className="flex-shrink-0">
+                            <ShieldX size={16} className="text-red-500" />
                           </span>
                         )}
                       </div>
