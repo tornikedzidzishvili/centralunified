@@ -47,6 +47,7 @@ model LoanApplication {
   branch             String
   verificationStatus Boolean  @default(false)
   status             String   @default("pending") // "pending", "in_progress", "approved", "rejected", "cancelled"
+  cancellationReason String?  // Reason for cancellation (required for officer/manager)
   details            String   // JSON string of full details
   createdAt          DateTime @default(now())
   closedAt           DateTime?

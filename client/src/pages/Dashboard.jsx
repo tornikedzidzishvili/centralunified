@@ -45,6 +45,10 @@ export default function Dashboard({ user, onLogout }) {
   const [reassigningLoan, setReassigningLoan] = useState(null);
   const [reassignBranch, setReassignBranch] = useState('');
   const [reassignOfficerId, setReassignOfficerId] = useState('');
+  
+  // Cancel modal (with comment for non-admin)
+  const [cancellingLoan, setCancellingLoan] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Branch options
   const branchOptions = [
@@ -197,16 +201,27 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  const updateLoanStatus = async (loanId, status) => {
+  const updateLoanStatus = async (loanId, status, cancellationReason = null) => {
     try {
-      await api.post(`/loans/${loanId}/status`, { status, userId: user.id });
+      await api.post(`/loans/${loanId}/status`, { status, userId: user.id, cancellationReason });
       fetchLoans();
       fetchStats();
       setClosingLoan(null);
       setSelectedLoan(null);
+      setCancellingLoan(null);
+      setCancelReason('');
     } catch (e) {
       alert('Status update failed: ' + e.message);
     }
+  };
+
+  // Handle cancel with comment (for non-admin users)
+  const handleCancelLoan = () => {
+    if (user.role !== 'admin' && !cancelReason.trim()) {
+      alert('გთხოვთ მიუთითოთ გაუქმების მიზეზი');
+      return;
+    }
+    updateLoanStatus(cancellingLoan.id, 'cancelled', cancelReason.trim() || null);
   };
 
   const handleLoanSearch = async (e) => {
@@ -263,9 +278,12 @@ export default function Dashboard({ user, onLogout }) {
     return false;
   };
 
-  // Check if user can cancel a loan (manager/admin only)
+  // Check if user can cancel a loan (admin, manager, or assigned officer)
   const canCancelLoan = (loan) => {
-    return user.role === 'admin' || user.role === 'manager';
+    if (user.role === 'admin' || user.role === 'manager') return true;
+    // Officer can cancel loans assigned to them
+    if (user.role === 'officer' && loan.assignedToId === user.id) return true;
+    return false;
   };
 
   const getRoleBadge = (role) => {
@@ -1008,6 +1026,14 @@ export default function Dashboard({ user, onLogout }) {
                           <p className="text-slate-500">ჯერ არ არის მინიჭებული საკრედიტო ოფიცერზე</p>
                         )}
                       </div>
+
+                      {/* Cancellation Reason (if cancelled) */}
+                      {selectedLoan.status === 'cancelled' && selectedLoan.cancellationReason && (
+                        <div className="bg-red-50 rounded-xl p-4">
+                          <h4 className="text-sm font-semibold text-red-600 uppercase tracking-wider mb-3">გაუქმების მიზეზი</h4>
+                          <p className="text-slate-700">{selectedLoan.cancellationReason}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1036,7 +1062,16 @@ export default function Dashboard({ user, onLogout }) {
                     )}
                     {canCancelLoan(selectedLoan) && (
                       <button 
-                        onClick={() => updateLoanStatus(selectedLoan.id, 'cancelled')}
+                        onClick={() => {
+                          if (user.role === 'admin') {
+                            // Admin can cancel directly without comment
+                            updateLoanStatus(selectedLoan.id, 'cancelled');
+                          } else {
+                            // Others must provide a reason
+                            setCancellingLoan(selectedLoan);
+                            setSelectedLoan(null);
+                          }
+                        }}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors text-sm"
                       >
                         <XCircle size={16} /> გაუქმება
@@ -1271,6 +1306,56 @@ export default function Dashboard({ user, onLogout }) {
                   className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   გადანაწილება
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Loan Modal (with reason for non-admin) */}
+        {cancellingLoan && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-600 text-white">
+                <h3 className="text-lg font-semibold">განაცხადის გაუქმება</h3>
+                <button onClick={() => { setCancellingLoan(null); setCancelReason(''); }} className="text-white/80 hover:text-white">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="mb-4">
+                  <p className="text-slate-700 mb-2">
+                    <span className="font-medium">{cancellingLoan.firstName} {cancellingLoan.lastName}</span> - 
+                    <span className="text-slate-500 ml-1">{cancellingLoan.branch}</span>
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    გაუქმების მიზეზი <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={e => setCancelReason(e.target.value)}
+                    placeholder="მიუთითეთ გაუქმების მიზეზი..."
+                    rows={4}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none resize-none"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button 
+                  onClick={() => { setCancellingLoan(null); setCancelReason(''); }}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
+                >
+                  დახურვა
+                </button>
+                <button 
+                  onClick={handleCancelLoan}
+                  disabled={!cancelReason.trim()}
+                  className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <XCircle size={16} className="inline mr-2" />
+                  გაუქმება
                 </button>
               </div>
             </div>
