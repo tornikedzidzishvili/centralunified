@@ -1144,10 +1144,16 @@ app.post('/api/assignment-requests/:id/handle', async (req, res) => {
   }
 });
 
-// Close/Update Loan Status (approve/reject)
+// Close/Update Loan Status (approve/reject/cancel)
 app.post('/api/loans/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status, userId } = req.body; // status: 'approved' or 'rejected'
+  const { status, userId } = req.body; // status: 'approved', 'rejected', or 'cancelled'
+  
+  // Validate status
+  const validStatuses = ['approved', 'rejected', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
   
   try {
     const loan = await prisma.loanApplication.update({

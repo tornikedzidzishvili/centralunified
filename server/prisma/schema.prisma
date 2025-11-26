@@ -46,7 +46,7 @@ model LoanApplication {
   mobile             String
   branch             String
   verificationStatus Boolean  @default(false)
-  status             String   @default("pending") // "pending", "in_progress", "approved", "rejected"
+  status             String   @default("pending") // "pending", "in_progress", "approved", "rejected", "cancelled"
   details            String   // JSON string of full details
   createdAt          DateTime @default(now())
   closedAt           DateTime?

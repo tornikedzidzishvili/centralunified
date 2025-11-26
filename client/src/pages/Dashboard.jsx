@@ -217,11 +217,26 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   const canCloseLoan = (loan) => {
-    // Admin, Manager, or assigned officer can close the loan
+    // Admin or Manager can close any loan
     // manager_viewer cannot close loans (read-only)
     if (user.role === 'admin' || user.role === 'manager') return true;
+    // Officer can only close loans assigned to them
     if (user.role === 'officer' && loan.assignedToId === user.id) return true;
     return false;
+  };
+
+  // Check if user can approve/reject a loan
+  const canApproveLoan = (loan) => {
+    // Admin or Manager can approve/reject any pending or in_progress loan
+    if (user.role === 'admin' || user.role === 'manager') return true;
+    // Officer can only approve/reject loans assigned to them
+    if (user.role === 'officer' && loan.assignedToId === user.id) return true;
+    return false;
+  };
+
+  // Check if user can cancel a loan (manager/admin only)
+  const canCancelLoan = (loan) => {
+    return user.role === 'admin' || user.role === 'manager';
   };
 
   const getRoleBadge = (role) => {
@@ -239,7 +254,8 @@ export default function Dashboard({ user, onLogout }) {
       pending: 'bg-yellow-100 text-yellow-700',
       in_progress: 'bg-blue-100 text-blue-700',
       approved: 'bg-green-100 text-green-700',
-      rejected: 'bg-red-100 text-red-700'
+      rejected: 'bg-red-100 text-red-700',
+      cancelled: 'bg-slate-100 text-slate-700'
     };
     return badges[status] || 'bg-slate-100 text-slate-700';
   };
@@ -249,7 +265,8 @@ export default function Dashboard({ user, onLogout }) {
       pending: 'მოლოდინში',
       in_progress: 'მიმდინარე',
       approved: 'დამტკიცებული',
-      rejected: 'უარყოფილი'
+      rejected: 'უარყოფილი',
+      cancelled: 'გაუქმებული'
     };
     return labels[status] || status;
   };
@@ -259,7 +276,8 @@ export default function Dashboard({ user, onLogout }) {
       pending: 'მოლოდინში',
       in_progress: 'მიმდინარე',
       approved: 'დამტკიცებული',
-      rejected: 'უარყოფილი'
+      rejected: 'უარყოფილი',
+      cancelled: 'გაუქმებული'
     };
     return texts[status] || status;
   };
@@ -711,7 +729,7 @@ export default function Dashboard({ user, onLogout }) {
                 ) : loans.length === 0 ? (
                   <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500"><FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />განაცხადები არ მოიძებნა</td></tr>
                 ) : loans.map(loan => (
-                  <tr key={loan.id} className={`hover:bg-slate-50 transition-colors ${loan.status === 'approved' ? 'bg-green-50/50' : loan.status === 'rejected' ? 'bg-red-50/50' : loan.status === 'in_progress' ? 'bg-blue-50/50' : ''}`}>
+                  <tr key={loan.id} className={`hover:bg-slate-50 transition-colors ${loan.status === 'approved' ? 'bg-green-50/50' : loan.status === 'rejected' ? 'bg-red-50/50' : loan.status === 'in_progress' ? 'bg-blue-50/50' : loan.status === 'cancelled' ? 'bg-slate-50/50' : ''}`}>
                     <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <div className="flex items-center gap-2">
                         <div className="min-w-0">
@@ -963,7 +981,7 @@ export default function Dashboard({ user, onLogout }) {
               </div>
               <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
                 <div className="flex gap-2">
-                  {canCloseLoan(selectedLoan) && selectedLoan.status === 'pending' && (
+                  {canApproveLoan(selectedLoan) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
                     <>
                       <button 
                         onClick={() => updateLoanStatus(selectedLoan.id, 'approved')}
@@ -978,6 +996,14 @@ export default function Dashboard({ user, onLogout }) {
                         <ThumbsDown size={16} /> უარყოფა
                       </button>
                     </>
+                  )}
+                  {canCancelLoan(selectedLoan) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
+                    <button 
+                      onClick={() => updateLoanStatus(selectedLoan.id, 'cancelled')}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      <XCircle size={16} /> გაუქმება
+                    </button>
                   )}
                 </div>
                 <div className="flex gap-3">
@@ -1016,25 +1042,44 @@ export default function Dashboard({ user, onLogout }) {
                   <p className="text-sm text-slate-500">განაცხადი:</p>
                   <p className="font-medium text-slate-800">{closingLoan.firstName} {closingLoan.lastName}</p>
                   <p className="text-sm text-slate-600">{closingLoan.branch}</p>
+                  {closingLoan.assignedTo && (
+                    <p className="text-sm text-blue-600 mt-1">ოფიცერი: {closingLoan.assignedTo.username}</p>
+                  )}
                 </div>
                 
                 <p className="text-sm font-medium text-slate-700 mb-4">აირჩიეთ სტატუსი:</p>
                 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => updateLoanStatus(closingLoan.id, 'approved')}
-                    className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-green-200 rounded-xl hover:bg-green-50 hover:border-green-400 transition-colors"
-                  >
-                    <ThumbsUp className="w-6 h-6 text-green-600" />
-                    <span className="font-medium text-green-700">დამტკიცება</span>
-                  </button>
-                  <button
-                    onClick={() => updateLoanStatus(closingLoan.id, 'rejected')}
-                    className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-400 transition-colors"
-                  >
-                    <ThumbsDown className="w-6 h-6 text-red-600" />
-                    <span className="font-medium text-red-700">უარყოფა</span>
-                  </button>
+                <div className="flex flex-col gap-3">
+                  {/* Approve/Reject - Only if user can approve */}
+                  {canApproveLoan(closingLoan) && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => updateLoanStatus(closingLoan.id, 'approved')}
+                        className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-green-200 rounded-xl hover:bg-green-50 hover:border-green-400 transition-colors"
+                      >
+                        <ThumbsUp className="w-6 h-6 text-green-600" />
+                        <span className="font-medium text-green-700">დამტკიცება</span>
+                      </button>
+                      <button
+                        onClick={() => updateLoanStatus(closingLoan.id, 'rejected')}
+                        className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-400 transition-colors"
+                      >
+                        <ThumbsDown className="w-6 h-6 text-red-600" />
+                        <span className="font-medium text-red-700">უარყოფა</span>
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Cancel - Manager/Admin only */}
+                  {canCancelLoan(closingLoan) && (
+                    <button
+                      onClick={() => updateLoanStatus(closingLoan.id, 'cancelled')}
+                      className="flex items-center justify-center gap-2 p-4 border-2 border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-400 transition-colors"
+                    >
+                      <XCircle className="w-6 h-6 text-slate-600" />
+                      <span className="font-medium text-slate-700">გაუქმება</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
