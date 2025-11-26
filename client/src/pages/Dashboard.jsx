@@ -40,6 +40,19 @@ export default function Dashboard({ user, onLogout }) {
   
   // Verified filter
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  
+  // Reassign modal (admin only)
+  const [reassigningLoan, setReassigningLoan] = useState(null);
+  const [reassignBranch, setReassignBranch] = useState('');
+  const [reassignOfficerId, setReassignOfficerId] = useState('');
+
+  // Branch options
+  const branchOptions = [
+    'საბურთალოს სერვისცენტრი',
+    'გლდანის ფილიალი',
+    'დიდუბის ფილიალი',
+    'ბათუმის ფილიალი'
+  ];
 
   useEffect(() => {
     fetchLoans();
@@ -156,7 +169,23 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-
+  const reassignLoan = async () => {
+    if (!reassigningLoan?.id) return;
+    
+    try {
+      await api.post(`/loans/${reassigningLoan.id}/reassign`, { 
+        branch: reassignBranch || undefined,
+        officerId: reassignOfficerId ? parseInt(reassignOfficerId) : undefined
+      });
+      setReassigningLoan(null);
+      setReassignBranch('');
+      setReassignOfficerId('');
+      fetchLoans();
+      alert('განაცხადი წარმატებით გადანაწილდა');
+    } catch (e) {
+      alert('გადანაწილება ვერ მოხერხდა: ' + (e.response?.data?.error || e.message));
+    }
+  };
 
   const assignLoan = async (loanId, officerId) => {
     try {
@@ -481,6 +510,10 @@ export default function Dashboard({ user, onLogout }) {
                 <h4 className="text-sm font-semibold text-slate-700 mb-3">ძიების შედეგი:</h4>
                 <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
                   <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-600">ფილიალი:</span>
+                    <span className="font-medium text-slate-800">{loanSearchResult.branch || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-slate-600">პროდუქტი:</span>
                     <span className="font-medium text-slate-800">{loanSearchResult.product || 'N/A'}</span>
                   </div>
@@ -498,6 +531,22 @@ export default function Dashboard({ user, onLogout }) {
                       {getStatusLabel(loanSearchResult.status)}
                     </span>
                   </div>
+                  
+                  {/* Admin Reassign Button */}
+                  {user.role === 'admin' && loanSearchResult.id && (
+                    <div className="pt-3 border-t border-slate-200">
+                      <button
+                        onClick={() => {
+                          setReassigningLoan(loanSearchResult);
+                          setShowLoanSearch(false);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                      >
+                        <RefreshCw size={16} />
+                        გადანაწილება
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1145,6 +1194,72 @@ export default function Dashboard({ user, onLogout }) {
                   className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
                 >
                   გაუქმება
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reassign Modal (Admin Only) */}
+        {reassigningLoan && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-orange-600 text-white">
+                <h3 className="text-lg font-semibold">განაცხადის გადანაწილება</h3>
+                <button onClick={() => { setReassigningLoan(null); setReassignBranch(''); setReassignOfficerId(''); }} className="text-white/80 hover:text-white">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                  <p className="text-sm text-slate-500">განაცხადის ID:</p>
+                  <p className="font-medium text-slate-800">#{reassigningLoan.id}</p>
+                  <p className="text-sm text-slate-600 mt-1">მიმდინარე ფილიალი: {reassigningLoan.branch || 'N/A'}</p>
+                  <p className="text-sm text-slate-600">მიმდინარე ექსპერტი: {reassigningLoan.expert || 'არ არის მინიჭებული'}</p>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">ახალი ფილიალი</label>
+                    <select
+                      value={reassignBranch}
+                      onChange={e => setReassignBranch(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    >
+                      <option value="">-- არ შეიცვალოს --</option>
+                      {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">ახალი საკრედიტო ოფიცერი</label>
+                    <select
+                      value={reassignOfficerId}
+                      onChange={e => setReassignOfficerId(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    >
+                      <option value="">-- არ შეიცვალოს / მოხსნა --</option>
+                      {officers.map(officer => (
+                        <option key={officer.id} value={officer.id}>{officer.username} ({officer.branches})</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">არჩევით მოხსნით მიმდინარე ოფიცერს</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button 
+                  onClick={() => { setReassigningLoan(null); setReassignBranch(''); setReassignOfficerId(''); }}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
+                >
+                  გაუქმება
+                </button>
+                <button 
+                  onClick={reassignLoan}
+                  disabled={!reassignBranch && !reassignOfficerId}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  გადანაწილება
                 </button>
               </div>
             </div>

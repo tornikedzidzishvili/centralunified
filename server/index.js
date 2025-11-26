@@ -948,9 +948,12 @@ app.get('/api/loans/search-secure', async (req, res) => {
     res.json({
       found: true,
       loan: {
+        id: matchedLoan.id,
         product,
         amount,
+        branch: matchedLoan.branch,
         expert: matchedLoan.assignedTo?.username || null,
+        assignedToId: matchedLoan.assignedToId,
         status: matchedLoan.status
       }
     });
@@ -972,6 +975,46 @@ app.post('/api/loans/:id/assign', async (req, res) => {
     }
   });
   res.json(loan);
+});
+
+// Reassign loan (admin only - change branch and/or officer)
+app.post('/api/loans/:id/reassign', async (req, res) => {
+  const { id } = req.params;
+  const { branch, officerId } = req.body;
+  
+  try {
+    const updateData = {};
+    
+    if (branch) {
+      updateData.branch = branch;
+    }
+    
+    // officerId can be a number (assign) or explicitly null/undefined (unassign)
+    if (officerId !== undefined) {
+      if (officerId) {
+        updateData.assignedToId = parseInt(officerId);
+        updateData.status = 'in_progress';
+      } else {
+        // Unassign - set to null and reset status to pending
+        updateData.assignedToId = null;
+        updateData.status = 'pending';
+      }
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'არცერთი ცვლილება არ მოთხოვნილა' });
+    }
+    
+    const loan = await prisma.loanApplication.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: { assignedTo: true }
+    });
+    
+    res.json(loan);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // Self-assign loan (officer takes their branch application)
