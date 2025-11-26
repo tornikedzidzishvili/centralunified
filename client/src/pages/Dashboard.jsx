@@ -533,14 +533,14 @@ export default function Dashboard({ user, onLogout }) {
                   </div>
                   
                   {/* Admin Reassign Button */}
-                  {user.role === 'admin' && loanSearchResult.id && (
+                  {user.role === 'admin' && loanSearchResult.id !== undefined && (
                     <div className="pt-3 border-t border-slate-200">
                       <button
                         onClick={() => {
                           setReassigningLoan(loanSearchResult);
                           setShowLoanSearch(false);
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors"
                       >
                         <RefreshCw size={16} />
                         გადანაწილება
@@ -1028,49 +1028,56 @@ export default function Dashboard({ user, onLogout }) {
                   );
                 })()}
               </div>
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
-                <div className="flex gap-2">
-                  {canApproveLoan(selectedLoan) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
-                    <>
+              
+              {/* Action Buttons - Approve/Reject/Cancel */}
+              {(canApproveLoan(selectedLoan) || canCancelLoan(selectedLoan)) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
+                <div className="px-6 py-3 border-t border-slate-200 bg-slate-50">
+                  <p className="text-xs text-slate-500 mb-2">მოქმედება:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {canApproveLoan(selectedLoan) && (
+                      <>
+                        <button 
+                          onClick={() => updateLoanStatus(selectedLoan.id, 'approved')}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm"
+                        >
+                          <ThumbsUp size={16} /> დამტკიცება
+                        </button>
+                        <button 
+                          onClick={() => updateLoanStatus(selectedLoan.id, 'rejected')}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors text-sm"
+                        >
+                          <ThumbsDown size={16} /> უარყოფა
+                        </button>
+                      </>
+                    )}
+                    {canCancelLoan(selectedLoan) && (
                       <button 
-                        onClick={() => updateLoanStatus(selectedLoan.id, 'approved')}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                        onClick={() => updateLoanStatus(selectedLoan.id, 'cancelled')}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors text-sm"
                       >
-                        <ThumbsUp size={16} /> დამტკიცება
+                        <XCircle size={16} /> გაუქმება
                       </button>
-                      <button 
-                        onClick={() => updateLoanStatus(selectedLoan.id, 'rejected')}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
-                      >
-                        <ThumbsDown size={16} /> უარყოფა
-                      </button>
-                    </>
-                  )}
-                  {canCancelLoan(selectedLoan) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
-                    <button 
-                      onClick={() => updateLoanStatus(selectedLoan.id, 'cancelled')}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
-                    >
-                      <XCircle size={16} /> გაუქმება
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-3">
-                  {(user.role === 'admin' || user.role === 'manager') && !selectedLoan.assignedTo && selectedLoan.status === 'pending' && (
-                    <button 
-                      onClick={() => { setSelectedLoan(null); setAssigningLoan(selectedLoan); }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
-                    >
-                      მინიჭება ოფიცერზე
-                    </button>
-                  )}
+              )}
+              
+              {/* Footer Buttons - Assign/Close */}
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                {(user.role === 'admin' || user.role === 'manager') && !selectedLoan.assignedTo && selectedLoan.status === 'pending' && (
                   <button 
-                    onClick={() => setSelectedLoan(null)}
-                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
+                    onClick={() => { setSelectedLoan(null); setAssigningLoan(selectedLoan); }}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
                   >
-                    დახურვა
+                    მინიჭება ოფიცერზე
                   </button>
-                </div>
+                )}
+                <button 
+                  onClick={() => setSelectedLoan(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
+                >
+                  დახურვა
+                </button>
               </div>
             </div>
           </div>
