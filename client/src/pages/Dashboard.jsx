@@ -904,9 +904,9 @@ export default function Dashboard({ user, onLogout }) {
         {/* Details Modal */}
         {selectedLoan && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex justify-between items-center bg-blue-600 text-white">
-                <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex justify-between items-center bg-blue-600 text-white flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                   <h3 className="text-base sm:text-lg font-semibold">სესხის დეტალები</h3>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedLoan.status || 'pending')}`}>
                     {getStatusText(selectedLoan.status || 'pending')}
@@ -917,11 +917,11 @@ export default function Dashboard({ user, onLogout }) {
                     </span>
                   )}
                 </div>
-                <button onClick={() => setSelectedLoan(null)} className="text-white/80 hover:text-white">
+                <button onClick={() => setSelectedLoan(null)} className="text-white/80 hover:text-white flex-shrink-0">
                   <X size={24} />
                 </button>
               </div>
-              <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">
                 {(() => {
                   const details = JSON.parse(selectedLoan.details || '{}');
                   return (
@@ -1015,7 +1015,7 @@ export default function Dashboard({ user, onLogout }) {
               
               {/* Action Buttons - Approve/Reject/Cancel */}
               {(canApproveLoan(selectedLoan) || canCancelLoan(selectedLoan)) && (selectedLoan.status === 'pending' || selectedLoan.status === 'in_progress') && (
-                <div className="px-6 py-3 border-t border-slate-200 bg-slate-50">
+                <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex-shrink-0">
                   <p className="text-xs text-slate-500 mb-2">მოქმედება:</p>
                   <div className="flex flex-wrap gap-2">
                     {canApproveLoan(selectedLoan) && (
@@ -1047,7 +1047,7 @@ export default function Dashboard({ user, onLogout }) {
               )}
               
               {/* Footer Buttons - Assign/Reassign/Close */}
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
+              <div className="px-4 sm:px-6 py-4 border-t border-slate-200 flex justify-between flex-shrink-0">
                 <div>
                   {/* Admin Reassign Button */}
                   {user.role === 'admin' && (
